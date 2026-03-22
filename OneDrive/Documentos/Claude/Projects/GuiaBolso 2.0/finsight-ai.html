@@ -16,7 +16,8 @@
     body{background:#f1f5f9;min-height:100vh;padding-bottom:72px}
     /* Desktop layout: constrain content to a centered column */
     #mainApp,#welcomePage,.onboarding-page,#uploadPage{max-width:600px;margin-left:auto;margin-right:auto}
-    #bottomNav{max-width:600px;margin-left:auto;margin-right:auto;left:50%;transform:translateX(-50%);border-radius:16px 16px 0 0;border:1px solid #e2e8f0;border-bottom:none}
+    /* Bottom nav: centered on desktop, full-width on mobile */
+    #bottomNav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:600px;background:white;z-index:50;height:64px;display:flex;align-items:stretch;padding:0 4px;box-shadow:0 -4px 20px rgba(0,0,0,.06);border-radius:16px 16px 0 0;border:1px solid #e2e8f0;border-bottom:none}
     #chatBtn{right:calc(50% - 316px)}
     #chatPanel{max-width:600px}
     @media(max-width:620px){
@@ -32,8 +33,7 @@
     /* Cards */
     .card{background:white;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04)}
     .card-sm{background:white;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.04)}
-    /* Bottom nav */
-    #bottomNav{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid #e2e8f0;z-index:50;height:64px;display:flex;align-items:stretch;padding:0 4px;box-shadow:0 -4px 20px rgba(0,0,0,.06)}
+    /* Bottom nav (definition merged into desktop layout block above) */
     .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border-radius:12px;margin:6px 2px;transition:all .15s;color:#94a3b8;font-size:.65rem;font-weight:600;letter-spacing:.02em}
     .nav-btn.active{color:#6366f1;background:#f1f0fe}
     .nav-btn:hover:not(.active){background:#f8fafc;color:#64748b}
@@ -393,8 +393,8 @@
         <p class="text-xs text-slate-400 mt-0.5">PDF · PNG · JPG · XLSX · CSV</p>
         <input id="fileInputMain" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv" multiple onchange="handleFilesMain(this.files)">
       </div>
-      <div id="uploadFileList" class="space-y-2 mb-3"></div>
-      <button id="uploadProcessBtn" onclick="processFiles()" class="hidden grad w-full text-white py-3 rounded-xl font-semibold text-sm">✨ Analyze with AI</button>
+      <div id="uploadFileListSheet" class="space-y-2 mb-3"></div>
+      <button id="uploadProcessBtnSheet" onclick="processFiles()" class="hidden grad w-full text-white py-3 rounded-xl font-semibold text-sm">✨ Analyze with AI</button>
       <p id="uploadApiWarning" class="hidden text-xs text-center text-amber-600 mt-2">⚠ API key required for new uploads.</p>
     </div>
   </div>
@@ -523,6 +523,12 @@
     <div class="card-sm p-3 mb-4 flex gap-2 flex-wrap">
       <select id="txnMonthFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="filterTransactions()"></select>
       <select id="txnCategoryFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="filterTransactions()"></select>
+      <select id="txnSortFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="filterTransactions()">
+        <option value="date_desc">Date ↓</option>
+        <option value="date_asc">Date ↑</option>
+        <option value="amount_desc">Amount ↓</option>
+        <option value="amount_asc">Amount ↑</option>
+      </select>
     </div>
 
     <!-- Transactions table -->
@@ -1136,7 +1142,7 @@ function removeFile(i) {
   state.files.splice(i, 1);
   handleUploadFiles(state.files);
   if (state.files.length === 0) {
-    document.getElementById('uploadProcessBtn').classList.add('hidden');
+    document.getElementById('uploadProcessBtnSheet').classList.add('hidden');
   }
 }
 
@@ -1149,7 +1155,7 @@ function handleFiles(fileList, isWelcome) {
     document.getElementById('apiPanel').classList.remove('hidden');
   } else {
     state.files = files;
-    const list = document.getElementById('uploadFileList');
+    const list = document.getElementById('uploadFileListSheet');
     list.innerHTML = '';
     files.forEach((f, i) => {
       const item = document.createElement('div');
@@ -1158,7 +1164,7 @@ function handleFiles(fileList, isWelcome) {
         <button style="background:none;border:none;color:#94a3b8;cursor:pointer" onclick="removeFile(${i})">×</button>`;
       list.appendChild(item);
     });
-    document.getElementById('uploadProcessBtn').classList.remove('hidden');
+    document.getElementById('uploadProcessBtnSheet').classList.remove('hidden');
   }
 }
 
@@ -1313,7 +1319,7 @@ async function processCSV(file) {
 }
 
 async function textToTxns(text) {
-  const sample = text.split('\n').slice(0, 300).join('\n');
+  const sample = text.split('\n').slice(0, 800).join('\n');
   const resp = await callClaude(sample);
   const parsed = resp.transactions || [];
 
@@ -1432,8 +1438,8 @@ function resetApp() {
 
 function showUploadSheet() {
   state.files = [];
-  document.getElementById('uploadFileList').innerHTML = '';
-  document.getElementById('uploadProcessBtn').classList.add('hidden');
+  document.getElementById('uploadFileListSheet').innerHTML = '';
+  document.getElementById('uploadProcessBtnSheet').classList.add('hidden');
   document.getElementById('fileInputMain').value = '';
   document.getElementById('uploadSheet').classList.remove('hidden');
 }
@@ -1521,9 +1527,9 @@ function renderDashboard() {
     document.getElementById('heroNet').textContent = `Net: ${fmt(net)}`;
   }
 
-  // Category chart
+  // Category chart (exclude Refunds & Credits)
   const catSums = {};
-  thisMonthTxns.forEach(t => {
+  thisMonthTxns.filter(t => t.category !== 'Refunds & Credits').forEach(t => {
     catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
   renderCategoryChart(catSums);
@@ -1652,7 +1658,7 @@ function renderMonthlyChart(spending) {
 
 function renderTopMerchants(txns, isCurrentMonth) {
   const sums = {};
-  txns.filter(t => !t._isTransfer).forEach(t => {
+  txns.filter(t => !t._isTransfer && t.category !== 'Refunds & Credits').forEach(t => {
     sums[t.description] = (sums[t.description] || 0) + Math.abs(t.amount);
   });
 
@@ -1814,36 +1820,51 @@ function populateMonthFilter() {
 function filterTransactions() {
   const month = document.getElementById('txnMonthFilter')?.value || '';
   const cat = document.getElementById('txnCategoryFilter')?.value || '';
+  const sort = document.getElementById('txnSortFilter')?.value || 'date_desc';
 
   let txns = state.transactions.slice();
   if (month) txns = txns.filter(t => budgetMonth(t) === month);
+
+  // Populate category filter from month-filtered set (not category-filtered) so options don't vanish
+  const catsForFilter = [...new Set(txns.map(t => t.category))].sort();
+  const prevCat = document.getElementById('txnCategoryFilter').value;
+  document.getElementById('txnCategoryFilter').innerHTML =
+    '<option value="">All categories</option>' +
+    catsForFilter.map(c => `<option value="${c}" ${c === prevCat ? 'selected' : ''}>${c}</option>`).join('');
+
   if (cat) txns = txns.filter(t => t.category === cat);
 
-  txns.sort((a, b) => new Date(b.date) - new Date(a.date));
+  if (sort === 'date_desc') txns.sort((a, b) => new Date(b.date) - new Date(a.date));
+  else if (sort === 'date_asc') txns.sort((a, b) => new Date(a.date) - new Date(b.date));
+  else if (sort === 'amount_desc') txns.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  else if (sort === 'amount_asc') txns.sort((a, b) => Math.abs(a.amount) - Math.abs(b.amount));
 
   const html = txns.map(t => {
     const isIncome = t._isIncome;
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${t.id}')">
-      <div class="flex-1">
-        <p class="font-semibold text-slate-800" dir="auto">${t.description}</p>
+      <div class="flex-1 min-w-0 mr-2">
+        <p class="font-semibold text-slate-800 truncate" dir="auto">${t.description}</p>
         <p class="text-xs text-slate-500">${t.date}</p>
       </div>
-      <div style="text-align:right">
+      <div style="text-align:right;flex-shrink:0">
         <p class="font-semibold ${isIncome ? 'text-green-600' : 'text-red-500'}">${isIncome ? '+' : '-'}${fmt(Math.abs(t.amount))}</p>
         <p class="text-xs text-slate-500">${t.category}</p>
       </div>
-      <button onclick="event.stopPropagation(); openCatModal('${t.id}')" class="text-xl text-slate-300 hover:text-slate-600 ml-2">✏</button>
+      <button onclick="event.stopPropagation(); openCatModal('${t.id}')" class="text-lg text-slate-300 hover:text-slate-600 ml-2 flex-shrink-0">✏</button>
+      <button onclick="event.stopPropagation(); deleteTxn('${t.id}')" class="text-lg text-slate-300 hover:text-red-400 ml-1 flex-shrink-0">🗑</button>
     </div>`;
   }).join('');
 
   document.getElementById('txnContainer').innerHTML = html || '<p class="text-slate-500 text-center py-8">No transactions</p>';
+}
 
-  // Populate category filter
-  const cats = [...new Set(txns.map(t => t.category))].sort();
-  const catHtml = '<option value="">All categories</option>' + cats.map(c =>
-    `<option value="${c}">${c}</option>`
-  ).join('');
-  document.getElementById('txnCategoryFilter').innerHTML = catHtml;
+function deleteTxn(id) {
+  if (!confirm('Delete this transaction?')) return;
+  state.transactions = state.transactions.filter(t => t.id !== id);
+  saveTransactions();
+  filterTransactions();
+  renderDashboard();
+  if (document.getElementById('page-budget')?.classList.contains('active')) renderBudgetPage();
 }
 
 function openCatModal(txnId) {
