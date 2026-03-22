@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "MyBudget Backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/dmalk/OneDrive/Documentos/Claude/Projects/GuiaBolso 2.0/backend/server.js"],
+      "port": 3000
+    }
+  ]
+}
