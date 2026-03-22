@@ -14,6 +14,15 @@
   <style>
     *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
     body{background:#f1f5f9;min-height:100vh;padding-bottom:72px}
+    /* Desktop layout: constrain content to a centered column */
+    #mainApp,#welcomePage,.onboarding-page,#uploadPage{max-width:600px;margin-left:auto;margin-right:auto}
+    #bottomNav{max-width:600px;margin-left:auto;margin-right:auto;left:50%;transform:translateX(-50%);border-radius:16px 16px 0 0;border:1px solid #e2e8f0;border-bottom:none}
+    #chatBtn{right:calc(50% - 316px)}
+    #chatPanel{max-width:600px}
+    @media(max-width:620px){
+      #bottomNav{max-width:100%;left:0;transform:none;border-radius:0;border:none;border-top:1px solid #e2e8f0}
+      #chatBtn{right:16px}
+    }
     /* Gradients */
     .grad{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
     .grad-green{background:linear-gradient(135deg,#10b981,#059669)}
@@ -151,16 +160,40 @@
   </div>
 </div>
 
-<!-- ══════════════ ONBOARDING STEP 1: COUNTRY ══════════════ -->
-<div id="onboarding1" class="onboarding-page">
+<!-- ══════════════ ONBOARDING: LANGUAGE ══════════════ -->
+<div id="langPage" class="onboarding-page">
   <div class="onboarding-card">
     <div class="step-indicator">
       <div class="step-dot active"></div>
       <div class="step-dot"></div>
       <div class="step-dot"></div>
+      <div class="step-dot"></div>
     </div>
-    <h2 class="text-2xl font-bold text-slate-800 mb-2">Where are you?</h2>
-    <p class="text-slate-500 mb-6">Select your country to set up the right currency.</p>
+    <h2 class="text-2xl font-bold text-slate-800 mb-2" data-i18n="lang_title">Choose your language</h2>
+    <p class="text-slate-500 mb-6" data-i18n="lang_sub">Pick the language for the app and your transaction names.</p>
+    <div class="multi-select-grid">
+      <button class="multi-select-btn" onclick="selectLanguage(this,'English')">🇺🇸 English</button>
+      <button class="multi-select-btn" onclick="selectLanguage(this,'Portuguese')">🇧🇷 Português</button>
+      <button class="multi-select-btn" onclick="selectLanguage(this,'Hebrew')">🇮🇱 עברית</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
+      <button class="onboarding-button secondary" onclick="prevPage('langPage')" data-i18n="btn_back">Back</button>
+      <button id="nextLangBtn" class="onboarding-button primary" onclick="nextPage('langPage')" disabled data-i18n="btn_next">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ONBOARDING STEP 1: COUNTRY ══════════════ -->
+<div id="onboarding1" class="onboarding-page">
+  <div class="onboarding-card">
+    <div class="step-indicator">
+      <div class="step-dot active"></div>
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+    </div>
+    <h2 class="text-2xl font-bold text-slate-800 mb-2" data-i18n="step1_title">Where are you?</h2>
+    <p class="text-slate-500 mb-6" data-i18n="step1_sub">Select your country to set up the right currency.</p>
     <div class="multi-select-grid">
       <button class="multi-select-btn" onclick="selectCountry('Brazil', 'BRL', 'R$'); updateStep1()">🇧🇷 Brazil (R$)</button>
       <button class="multi-select-btn" onclick="selectCountry('Israel', 'ILS', '₪'); updateStep1()">🇮🇱 Israel (₪)</button>
@@ -171,8 +204,8 @@
       <button class="multi-select-btn" onclick="selectCountryOther()">Other country →</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
-      <button class="onboarding-button secondary" onclick="prevPage('onboarding1')">Back</button>
-      <button id="next1Btn" class="onboarding-button primary" onclick="nextPage('onboarding1')" disabled>Next</button>
+      <button class="onboarding-button secondary" onclick="prevPage('onboarding1')" data-i18n="btn_back">Back</button>
+      <button id="next1Btn" class="onboarding-button primary" onclick="nextPage('onboarding1')" disabled data-i18n="btn_next">Next</button>
     </div>
   </div>
 </div>
@@ -183,21 +216,22 @@
     <div class="step-indicator">
       <div class="step-dot active"></div>
       <div class="step-dot active"></div>
+      <div class="step-dot active"></div>
       <div class="step-dot"></div>
     </div>
-    <h2 class="text-2xl font-bold text-slate-800 mb-2">What are your goals?</h2>
-    <p class="text-slate-500 mb-6">Select one or more to help us tailor insights.</p>
+    <h2 class="text-2xl font-bold text-slate-800 mb-2" data-i18n="step2_title">What are your goals?</h2>
+    <p class="text-slate-500 mb-6" data-i18n="step2_sub">Select one or more to help us tailor insights.</p>
     <div class="multi-select-grid">
-      <button class="multi-select-btn" onclick="toggleGoal(this, 'Track credit card')">💳 Track my credit card spending</button>
-      <button class="multi-select-btn" onclick="toggleGoal(this, 'Complete overview')">🏦 Complete overview of my bank account</button>
-      <button class="multi-select-btn" onclick="toggleGoal(this, 'Plan for future')">📈 Plan for the future</button>
-      <button class="multi-select-btn" onclick="toggleGoal(this, 'Better management')">💡 Help manage my finances better</button>
-      <button class="multi-select-btn" onclick="toggleGoal(this, 'Reduce spending')">💰 Reduce unnecessary spending</button>
-      <button class="multi-select-btn" onclick="toggleGoal(this, 'Save for goals')">🎯 Save for specific goals</button>
+      <button class="multi-select-btn" onclick="toggleGoal(this, 'Track credit card')" data-i18n="goal_credit">💳 Track my credit card spending</button>
+      <button class="multi-select-btn" onclick="toggleGoal(this, 'Complete overview')" data-i18n="goal_overview">🏦 Complete overview of my bank account</button>
+      <button class="multi-select-btn" onclick="toggleGoal(this, 'Plan for future')" data-i18n="goal_future">📈 Plan for the future</button>
+      <button class="multi-select-btn" onclick="toggleGoal(this, 'Better management')" data-i18n="goal_manage">💡 Help manage my finances better</button>
+      <button class="multi-select-btn" onclick="toggleGoal(this, 'Reduce spending')" data-i18n="goal_reduce">💰 Reduce unnecessary spending</button>
+      <button class="multi-select-btn" onclick="toggleGoal(this, 'Save for goals')" data-i18n="goal_save">🎯 Save for specific goals</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
-      <button class="onboarding-button secondary" onclick="prevPage('onboarding2')">Back</button>
-      <button class="onboarding-button primary" onclick="nextPage('onboarding2')">Next</button>
+      <button class="onboarding-button secondary" onclick="prevPage('onboarding2')" data-i18n="btn_back">Back</button>
+      <button class="onboarding-button primary" onclick="nextPage('onboarding2')" data-i18n="btn_next">Next</button>
     </div>
   </div>
 </div>
@@ -209,18 +243,19 @@
       <div class="step-dot active"></div>
       <div class="step-dot active"></div>
       <div class="step-dot active"></div>
+      <div class="step-dot active"></div>
     </div>
-    <h2 class="text-2xl font-bold text-slate-800 mb-2">How do you manage money?</h2>
-    <p class="text-slate-500 mb-6">Tell us your current method.</p>
+    <h2 class="text-2xl font-bold text-slate-800 mb-2" data-i18n="step3_title">How do you manage money?</h2>
+    <p class="text-slate-500 mb-6" data-i18n="step3_sub">Tell us your current method.</p>
     <div class="multi-select-grid">
-      <button class="multi-select-btn" onclick="selectMethod(this, 'Spreadsheets')">📊 Spreadsheets</button>
-      <button class="multi-select-btn" onclick="selectMethod(this, 'Other app')">📱 Other app</button>
-      <button class="multi-select-btn" onclick="selectMethod(this, 'Nothing yet')">🎯 Nothing yet</button>
-      <button class="multi-select-btn" onclick="selectMethod(this, 'Pen and paper')">✍️ Pen and paper</button>
+      <button class="multi-select-btn" onclick="selectMethod(this, 'Spreadsheets')" data-i18n="method_spreadsheets">📊 Spreadsheets</button>
+      <button class="multi-select-btn" onclick="selectMethod(this, 'Other app')" data-i18n="method_app">📱 Other app</button>
+      <button class="multi-select-btn" onclick="selectMethod(this, 'Nothing yet')" data-i18n="method_nothing">🎯 Nothing yet</button>
+      <button class="multi-select-btn" onclick="selectMethod(this, 'Pen and paper')" data-i18n="method_paper">✍️ Pen and paper</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
-      <button class="onboarding-button secondary" onclick="prevPage('onboarding3')">Back</button>
-      <button class="onboarding-button primary" onclick="nextPage('onboarding3')">Start using</button>
+      <button class="onboarding-button secondary" onclick="prevPage('onboarding3')" data-i18n="btn_back">Back</button>
+      <button class="onboarding-button primary" onclick="nextPage('onboarding3')" data-i18n="btn_start">Start using</button>
     </div>
   </div>
 </div>
@@ -228,19 +263,19 @@
 <!-- ══════════════ UPLOAD PAGE ══════════════ -->
 <div id="uploadPage" class="upload-page">
   <div class="upload-card">
-    <h2 class="text-2xl font-bold text-slate-800 mb-2 text-center">Upload Your Data</h2>
-    <p class="text-slate-500 mb-8 text-center">Drag and drop your bank statement or financial export.</p>
+    <h2 class="text-2xl font-bold text-slate-800 mb-2 text-center" data-i18n="upload_title">Upload Your Data</h2>
+    <p class="text-slate-500 mb-8 text-center" data-i18n="upload_sub">Drag and drop your bank statement or financial export.</p>
     <div class="big-upload-zone" id="uploadZone" onclick="document.getElementById('uploadFileInput').click()" ondragover="handleDragOver(event,'uploadZone')" ondragleave="handleDragLeave('uploadZone')" ondrop="handleDropUpload(event)">
       <div class="big-upload-zone-icon">📄</div>
-      <p class="font-semibold text-slate-700 mb-1">Drop files here or tap to browse</p>
-      <p class="text-xs text-slate-500">CSV, XLSX, XLS, PDF, PNG, JPG</p>
+      <p class="font-semibold text-slate-700 mb-1" data-i18n="upload_drop">Drop files here or tap to browse</p>
+      <p class="text-xs text-slate-500" data-i18n="upload_formats">CSV, XLSX, XLS, PDF, PNG, JPG</p>
       <input id="uploadFileInput" type="file" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg" multiple onchange="handleUploadFiles(this.files)">
     </div>
-    <button onclick="document.getElementById('uploadFileInput').click()" class="onboarding-button secondary" style="margin-bottom:12px">Browse files</button>
-    <button onclick="useTestData()" class="onboarding-button secondary" style="border-color:#10b981;color:#10b981">Try with sample data</button>
+    <button onclick="document.getElementById('uploadFileInput').click()" class="onboarding-button secondary" style="margin-bottom:12px" data-i18n="upload_browse">Browse files</button>
+    <button onclick="useTestData()" class="onboarding-button secondary" style="border-color:#10b981;color:#10b981" data-i18n="upload_sample">Try with sample data</button>
     <div id="uploadFileList" class="mt-6 space-y-2"></div>
-    <button id="uploadProcessBtn" class="hidden onboarding-button primary" onclick="processUploadedFiles()">Analyze Files</button>
-    <p class="text-xs text-slate-500 text-center mt-8">🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.</p>
+    <button id="uploadProcessBtn" class="hidden onboarding-button primary" onclick="processUploadedFiles()" data-i18n="upload_analyze">Analyze Files</button>
+    <p class="text-xs text-slate-500 text-center mt-8" data-i18n="upload_privacy">🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.</p>
   </div>
 </div>
 
@@ -318,6 +353,14 @@
   </div>
 </div>
 
+<!-- PROCESSING OVERLAY (outside mainApp so it works during upload too) -->
+<div id="processingOverlay" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center px-8" style="background:rgba(248,250,252,.97);z-index:200">
+  <div class="grad w-20 h-20 rounded-full flex items-center justify-center mb-6" style="box-shadow:0 8px 32px rgba(99,102,241,.4)">
+    <svg class="spin w-9 h-9 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3.5"/><path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z"/></svg>
+  </div>
+  <p id="procMessage" class="text-lg font-semibold text-slate-700" style="min-height:1.8em;transition:opacity .3s"></p>
+</div>
+
 <!-- ══════════════ MAIN APP ══════════════ -->
 <div id="mainApp" class="hidden">
 
@@ -338,8 +381,8 @@
   </header>
 
   <!-- UPLOAD SHEET (slides up) -->
-  <div id="uploadSheet" class="hidden fixed inset-0 z-50 flex items-end justify-center" style="background:rgba(15,23,42,.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)hideUploadSheet()">
-    <div class="card w-full max-w-lg rounded-t-2xl p-6 pb-8">
+  <div id="uploadSheet" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(15,23,42,.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)hideUploadSheet()">
+    <div class="card w-full max-w-lg rounded-2xl p-6 mx-4" style="max-height:90vh;overflow-y:auto">
       <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5"></div>
       <h3 class="font-semibold text-slate-800 mb-4">Upload Statement</h3>
       <div id="uploadZoneMain" class="upload-zone p-8 text-center mb-3"
@@ -354,16 +397,6 @@
       <button id="uploadProcessBtn" onclick="processFiles()" class="hidden grad w-full text-white py-3 rounded-xl font-semibold text-sm">✨ Analyze with AI</button>
       <p id="uploadApiWarning" class="hidden text-xs text-center text-amber-600 mt-2">⚠ API key required for new uploads.</p>
     </div>
-  </div>
-
-  <!-- PROCESSING OVERLAY -->
-  <div id="processingOverlay" class="hidden fixed inset-0 z-60 flex flex-col items-center justify-center text-center px-8" style="background:rgba(248,250,252,.96);z-index:60">
-    <div class="grad w-16 h-16 rounded-full flex items-center justify-center mb-5" style="box-shadow:0 6px 24px rgba(99,102,241,.4)">
-      <svg class="spin w-7 h-7 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z"/></svg>
-    </div>
-    <h2 class="text-xl font-bold text-slate-800 mb-1">Analyzing…</h2>
-    <p id="procStatus" class="text-slate-500 text-sm mb-5">Reading your statement</p>
-    <div class="pbar-track w-60"><div id="procBar" class="pbar-fill grad" style="width:0%"></div></div>
   </div>
 
   <!-- ─── PAGE: OVERVIEW ─── -->
@@ -393,11 +426,7 @@
         <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fixed vs Variable</span>
         <button onclick="switchTab('budget')" class="text-xs text-indigo-500 font-medium">Details →</button>
       </div>
-      <div class="fv-bar mb-2" id="overviewFvBar"></div>
-      <div class="flex justify-between text-xs">
-        <span id="overviewFvFixedLabel" class="text-indigo-500 font-semibold"></span>
-        <span id="overviewFvVariableLabel" class="text-amber-600 font-semibold"></span>
-      </div>
+      <div id="overviewFvBar"></div>
     </div>
 
     <!-- Category breakdown -->
@@ -520,19 +549,19 @@
   <div id="bottomNav">
     <div class="nav-btn active" onclick="switchTab('overview')">
       <div class="nav-icon">📊</div>
-      <span>Overview</span>
+      <span data-i18n="nav_overview">Overview</span>
     </div>
     <div class="nav-btn" onclick="switchTab('budget')">
       <div class="nav-icon">💼</div>
-      <span>Budget</span>
+      <span data-i18n="nav_budget">Budget</span>
     </div>
     <div class="nav-btn" onclick="switchTab('transactions')">
       <div class="nav-icon">📜</div>
-      <span>Transactions</span>
+      <span data-i18n="nav_transactions">Transactions</span>
     </div>
     <div class="nav-btn" onclick="toggleSettingsMenu()">
       <div class="nav-icon">⚙️</div>
-      <span>Settings</span>
+      <span data-i18n="nav_settings">Settings</span>
     </div>
   </div>
 
@@ -596,16 +625,105 @@ const LS = {
   VARIABLE: 'mybudget_variable',
   CUSTOM_CATS: 'mybudget_custom_cats',
   GOALS: 'mybudget_goals',
-  API_KEY: 'mybudget_api_key'
+  API_KEY: 'mybudget_api_key',
+  LANGUAGE: 'mybudget_language'
 };
 
 const DEFAULT_FIXED_CATS = ['Subscriptions & Software', 'Insurance', 'Loans & Debt', 'Banking Fees', 'Housing'];
+
+// ─────────────────────────────────────
+// INTERNATIONALISATION
+// ─────────────────────────────────────
+const STRINGS = {
+  English: {
+    welcome_tagline:'Take the reins of your finances',welcome_btn:'Get Started',
+    lang_title:'Choose your language',lang_sub:'Pick the language for the app and your transaction names.',
+    step1_title:'Where are you?',step1_sub:'Select your country to set up the right currency.',
+    step2_title:'What are your goals?',step2_sub:'Select one or more to help us tailor insights.',
+    step3_title:'How do you manage money?',step3_sub:'Tell us your current method.',
+    btn_back:'Back',btn_next:'Next',btn_start:'Start using',
+    goal_credit:'💳 Track my credit card spending',goal_overview:'🏦 Complete overview of my bank account',
+    goal_future:'📈 Plan for the future',goal_manage:'💡 Help manage my finances better',
+    goal_reduce:'💰 Reduce unnecessary spending',goal_save:'🎯 Save for specific goals',
+    method_spreadsheets:'📊 Spreadsheets',method_app:'📱 Other app',method_nothing:'🎯 Nothing yet',method_paper:'✍️ Pen and paper',
+    upload_title:'Upload Your Data',upload_sub:'Drag and drop your bank statement or financial export.',
+    upload_drop:'Drop files here or tap to browse',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
+    upload_browse:'Browse files',upload_sample:'Try with sample data',upload_analyze:'Analyze Files',
+    upload_privacy:'🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.',
+    proc_messages:['Importing transactions…','Reading your statement…','Categorizing expenses…','Optimizing your budget…','Almost there…'],
+    nav_overview:'Overview',nav_budget:'Budget',nav_transactions:'Transactions',nav_settings:'Settings',
+  },
+  Portuguese: {
+    welcome_tagline:'Assuma o controle das suas finanças',welcome_btn:'Começar',
+    lang_title:'Escolha seu idioma',lang_sub:'Escolha o idioma do aplicativo e das suas transações.',
+    step1_title:'Onde você está?',step1_sub:'Selecione seu país para configurar a moeda correta.',
+    step2_title:'Quais são seus objetivos?',step2_sub:'Selecione um ou mais para personalizar os insights.',
+    step3_title:'Como você gerencia seu dinheiro?',step3_sub:'Conta pra gente seu método atual.',
+    btn_back:'Voltar',btn_next:'Próximo',btn_start:'Começar a usar',
+    goal_credit:'💳 Controlar gastos do cartão',goal_overview:'🏦 Visão completa da conta bancária',
+    goal_future:'📈 Planejar para o futuro',goal_manage:'💡 Gerenciar melhor as finanças',
+    goal_reduce:'💰 Reduzir gastos desnecessários',goal_save:'🎯 Poupar para objetivos',
+    method_spreadsheets:'📊 Planilhas',method_app:'📱 Outro aplicativo',method_nothing:'🎯 Nada ainda',method_paper:'✍️ Papel e caneta',
+    upload_title:'Envie seus dados',upload_sub:'Arraste e solte seu extrato bancário ou exportação financeira.',
+    upload_drop:'Solte os arquivos aqui ou toque para procurar',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
+    upload_browse:'Procurar arquivos',upload_sample:'Testar com dados de exemplo',upload_analyze:'Analisar arquivos',
+    upload_privacy:'🔒 Seus dados ficam privados. Todo o processamento é feito com segurança e seus dados financeiros nunca são armazenados em nossos servidores.',
+    proc_messages:['Importando transações…','Lendo seu extrato…','Categorizando despesas…','Otimizando seu orçamento…','Quase lá…'],
+    nav_overview:'Visão Geral',nav_budget:'Orçamento',nav_transactions:'Transações',nav_settings:'Ajustes',
+  },
+  Hebrew: {
+    welcome_tagline:'קח שליטה על הכספים שלך',welcome_btn:'בואו נתחיל',
+    lang_title:'בחר שפה',lang_sub:'בחר את שפת האפליקציה ושמות העסקאות.',
+    step1_title:'איפה אתה גר?',step1_sub:'בחר את המדינה שלך כדי להגדיר את המטבע.',
+    step2_title:'מה המטרות שלך?',step2_sub:'בחר אחת או יותר כדי שנוכל להתאים את התובנות.',
+    step3_title:'איך אתה מנהל כסף?',step3_sub:'ספר לנו את השיטה הנוכחית שלך.',
+    btn_back:'חזרה',btn_next:'הבא',btn_start:'להתחיל',
+    goal_credit:'💳 לעקוב אחרי הוצאות כרטיס האשראי',goal_overview:'🏦 סקירה מלאה של חשבון הבנק',
+    goal_future:'📈 לתכנן לעתיד',goal_manage:'💡 לנהל את הכספים טוב יותר',
+    goal_reduce:'💰 להפחית הוצאות מיותרות',goal_save:'🎯 לחסוך למטרות ספציפיות',
+    method_spreadsheets:'📊 גיליונות אלקטרוניים',method_app:'📱 אפליקציה אחרת',method_nothing:'🎯 עדיין שום דבר',method_paper:'✍️ עט ונייר',
+    upload_title:'העלאת נתונים',upload_sub:'גרור ושחרר את דף החשבון שלך או קובץ ייצוא פיננסי.',
+    upload_drop:'שחרר קבצים כאן או הקש לעיון',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
+    upload_browse:'עיון בקבצים',upload_sample:'נסה עם נתוני דוגמה',upload_analyze:'ניתוח קבצים',
+    upload_privacy:'🔒 הנתונים שלך נשארים פרטיים. כל העיבוד מתבצע בצורה מאובטחת ולעולם אינו מאוחסן בשרתים שלנו.',
+    proc_messages:['מייבא עסקאות…','קורא את דף החשבון…','מסווג הוצאות…','מייעל את התקציב שלך…','כמעט מוכן…'],
+    nav_overview:'סקירה',nav_budget:'תקציב',nav_transactions:'עסקאות',nav_settings:'הגדרות',
+  }
+};
+
+function t(key) {
+  const s = STRINGS[state.language] || STRINGS.English;
+  return s[key] !== undefined ? s[key] : (STRINGS.English[key] || key);
+}
+
+function applyLanguage() {
+  const isRTL = state.language === 'Hebrew';
+  document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = t(key);
+    if (typeof val === 'string') {
+      if (el.tagName === 'INPUT') el.placeholder = val;
+      else el.textContent = val;
+    }
+  });
+}
+
+function selectLanguage(btn, lang) {
+  document.querySelectorAll('#langPage .multi-select-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.language = lang;
+  try { localStorage.setItem(LS.LANGUAGE, lang); } catch(e) {}
+  applyLanguage();
+  document.getElementById('nextLangBtn').disabled = false;
+}
 
 // ─────────────────────────────────────
 // STATE
 // ─────────────────────────────────────
 const state = {
   apiKey: '',
+  language: 'English',
   onboarding: {
     country: null,
     currency: null,
@@ -855,6 +973,8 @@ function loadStorage() {
     if (gl) state.goals = JSON.parse(gl);
     const ak = localStorage.getItem(LS.API_KEY);
     if (ak) state.apiKey = ak;
+    const lang = localStorage.getItem(LS.LANGUAGE);
+    if (lang) state.language = lang;
   } catch(e) { console.warn('Storage load error', e); }
 }
 
@@ -953,18 +1073,20 @@ function selectMethod(btn, method) {
 // ─────────────────────────────────────
 function nextPage(from) {
   const pages = {
-    'welcome': 'onboarding1',
+    'welcome': 'langPage',
+    'langPage': 'onboarding1',
     'onboarding1': 'onboarding2',
     'onboarding2': 'onboarding3',
     'onboarding3': 'uploadPage'
   };
 
-  // Only validate country when leaving onboarding1 (going to step 2)
-  if (from === 'onboarding1') {
-    if (!state.onboarding.country) {
-      alert('Please select a country');
-      return;
-    }
+  if (from === 'langPage' && !state.language) {
+    alert('Please select a language');
+    return;
+  }
+  if (from === 'onboarding1' && !state.onboarding.country) {
+    alert('Please select a country');
+    return;
   }
 
   document.querySelectorAll('.onboarding-page, .upload-page').forEach(p => p.classList.remove('active'));
@@ -973,7 +1095,8 @@ function nextPage(from) {
 
 function prevPage(pageId) {
   const pages = {
-    'onboarding1': 'welcomePage',
+    'langPage': 'welcomePage',
+    'onboarding1': 'langPage',
     'onboarding2': 'onboarding1',
     'onboarding3': 'onboarding2'
   };
@@ -1089,6 +1212,7 @@ async function processUploadedFiles() {
 
 async function processFiles() {
   if (state.files.length === 0) return;
+  hideUploadSheet();
   showProcessing();
 
   try {
@@ -1146,11 +1270,12 @@ async function processPDF(file) {
         const content = await page.getTextContent();
 
         // Group text by row (same Y coordinate) for better readability
+        // pdf.js stores position in transform[5] (y), not item.y
         const rows = {};
         content.items.forEach(item => {
-          const y = Math.round(item.y);
+          const y = Math.round(item.transform ? item.transform[5] : (item.y || 0));
           if (!rows[y]) rows[y] = [];
-          rows[y].push(item.str);
+          if (item.str) rows[y].push(item.str);
         });
 
         // Join rows
@@ -1188,11 +1313,12 @@ async function processCSV(file) {
 }
 
 async function textToTxns(text) {
-  const sample = text.split('\n').slice(0, 50).join('\n');
+  const sample = text.split('\n').slice(0, 300).join('\n');
   const resp = await callClaude(sample);
   const parsed = resp.transactions || [];
 
   parsed.forEach(p => {
+    const cat = p.category || 'Other';
     state.transactions.push({
       id: Math.random().toString(36).slice(2),
       date: p.date,
@@ -1202,10 +1328,10 @@ async function textToTxns(text) {
       amount: p.amount,
       currency: state.onboarding.currency || 'BRL',
       type: p.amount > 0 ? 'credit' : 'debit',
-      category: p.category || 'Other',
+      category: cat,
       source: 'bank',
-      _isIncome: p.amount > 0,
-      _isTransfer: false
+      _isIncome: cat === 'Income',
+      _isTransfer: cat === 'Transfers'
     });
   });
 }
@@ -1246,7 +1372,8 @@ async function callClaude(content, country = null) {
     },
     body: JSON.stringify({
       content: content,
-      country: country || state.onboarding.country || 'Brazil'
+      country: country || state.onboarding.country || 'Brazil',
+      language: state.language || 'English'
     })
   });
 
@@ -1273,6 +1400,7 @@ function fileToBase64(file) {
 // ─────────────────────────────────────
 function checkExistingSession() {
   loadStorage();
+  applyLanguage();
 
   if (state.onboarding.country) {
     // User has onboarded
@@ -1291,8 +1419,8 @@ function checkExistingSession() {
 function startApp() {
   document.querySelectorAll('.onboarding-page, .upload-page').forEach(p => p.classList.remove('active'));
   document.getElementById('mainApp').classList.remove('hidden');
-  renderDashboard();
   loadStorage();
+  renderDashboard();
 }
 
 function resetApp() {
@@ -1303,6 +1431,10 @@ function resetApp() {
 }
 
 function showUploadSheet() {
+  state.files = [];
+  document.getElementById('uploadFileList').innerHTML = '';
+  document.getElementById('uploadProcessBtn').classList.add('hidden');
+  document.getElementById('fileInputMain').value = '';
   document.getElementById('uploadSheet').classList.remove('hidden');
 }
 
@@ -1310,17 +1442,29 @@ function hideUploadSheet() {
   document.getElementById('uploadSheet').classList.add('hidden');
 }
 
+let _procInterval = null;
+
 function showProcessing() {
-  document.getElementById('processingOverlay').classList.remove('hidden');
+  const overlay = document.getElementById('processingOverlay');
+  overlay.classList.remove('hidden');
+  const msgs = t('proc_messages');
+  const msgEl = document.getElementById('procMessage');
+  let i = 0;
+  msgEl.style.opacity = '1';
+  msgEl.textContent = msgs[i];
+  _procInterval = setInterval(() => {
+    msgEl.style.opacity = '0';
+    setTimeout(() => {
+      i = (i + 1) % msgs.length;
+      msgEl.textContent = msgs[i];
+      msgEl.style.opacity = '1';
+    }, 300);
+  }, 2500);
 }
 
 function hideProcessing() {
   document.getElementById('processingOverlay').classList.add('hidden');
-}
-
-function setProgress(pct, msg) {
-  document.getElementById('procBar').style.width = pct + '%';
-  document.getElementById('procStatus').textContent = msg;
+  if (_procInterval) { clearInterval(_procInterval); _procInterval = null; }
 }
 
 // ─────────────────────────────────────
@@ -1352,15 +1496,20 @@ function toggleFixed(txnId) {
 // RENDERING
 // ─────────────────────────────────────
 function renderDashboard() {
-  const debits = state.transactions.filter(t => t.type === 'debit');
-  const credits = state.transactions.filter(t => t.type === 'credit');
+  // Use category-based flags — more reliable than amount sign
+  // (credit card statements return spending as positive amounts)
+  const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
+  const credits = state.transactions.filter(t => t._isIncome);
 
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const thisMonthTxns = debits.filter(t => budgetMonth(t) === thisMonth);
+  // Fall back to most recent data month if current calendar month has no spending
+  const nowMonth = new Date().toISOString().slice(0, 7);
+  const spendMonths = [...new Set(spending.map(t => budgetMonth(t)).filter(Boolean))].sort();
+  const thisMonth = spendMonths.includes(nowMonth) ? nowMonth : (spendMonths.at(-1) || nowMonth);
+  const thisMonthTxns = spending.filter(t => budgetMonth(t) === thisMonth);
   const thisMonthIncome = credits.filter(t => budgetMonth(t) === thisMonth);
 
-  const totalSpent = thisMonthTxns.reduce((s, t) => s + t.amount, 0);
-  const totalIncome = thisMonthIncome.reduce((s, t) => s + t.amount, 0);
+  const totalSpent = thisMonthTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalIncome = thisMonthIncome.reduce((s, t) => s + Math.abs(t.amount), 0);
 
   document.getElementById('heroTotal').textContent = fmt(totalSpent);
   document.getElementById('heroCount').textContent = `${thisMonthTxns.length} transactions`;
@@ -1375,16 +1524,16 @@ function renderDashboard() {
   // Category chart
   const catSums = {};
   thisMonthTxns.forEach(t => {
-    catSums[t.category] = (catSums[t.category] || 0) + t.amount;
+    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
   renderCategoryChart(catSums);
 
   // Monthly chart
-  renderMonthlyChart(debits);
+  renderMonthlyChart(spending);
 
   // Fixed vs Variable
-  const fixedSum = thisMonthTxns.filter(t => isFixed(t)).reduce((s, t) => s + t.amount, 0);
-  const variableSum = thisMonthTxns.filter(t => !isFixed(t)).reduce((s, t) => s + t.amount, 0);
+  const fixedSum = thisMonthTxns.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const variableSum = thisMonthTxns.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
   const fvHtml = `<div class="fv-bar mb-2">
     <div style="flex:${fixedSum};background:#6366f1"></div>
     <div style="flex:${variableSum};background:#f59e0b"></div>
@@ -1394,8 +1543,6 @@ function renderDashboard() {
     <span class="text-amber-600 font-semibold">Variable: ${fmt(variableSum)}</span>
   </div>`;
   document.getElementById('overviewFvBar').innerHTML = fvHtml;
-  document.getElementById('overviewFvFixedLabel').textContent = `Fixed: ${fmt(fixedSum)}`;
-  document.getElementById('overviewFvVariableLabel').textContent = `Variable: ${fmt(variableSum)}`;
 
   // Top merchants
   renderTopMerchants(thisMonthTxns, true);
@@ -1442,57 +1589,71 @@ function renderCategoryChart(catSums) {
   });
 }
 
-function renderMonthlyChart(debits) {
+function renderMonthlyChart(spending) {
   const monthly = {};
-  debits.forEach(t => {
+  spending.forEach(t => {
     const m = budgetMonth(t);
-    monthly[m] = (monthly[m] || 0) + t.amount;
+    monthly[m] = (monthly[m] || 0) + Math.abs(t.amount);
   });
 
   const monthlyIncome = {};
-  state.transactions.filter(t => t.type === 'credit').forEach(t => {
+  state.transactions.filter(t => t._isIncome).forEach(t => {
     const m = budgetMonth(t);
     monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
 
-  const CHART_MONTHS = ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'];
+  // Dynamic last 6 months anchored to most recent data month (not today)
+  const allDataMonths = [...new Set([
+    ...spending.map(t => budgetMonth(t)),
+    ...state.transactions.filter(t => t._isIncome).map(t => budgetMonth(t))
+  ].filter(Boolean))].sort();
+  const latestDataMonth = allDataMonths.at(-1) || new Date().toISOString().slice(0, 7);
+  const latestDate = new Date(latestDataMonth + '-02'); // +02 avoids timezone edge cases
+  const CHART_MONTHS = Array.from({length: 6}, (_, i) => {
+    const d = new Date(latestDate.getFullYear(), latestDate.getMonth() - 5 + i, 1);
+    return d.toISOString().slice(0, 7);
+  });
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmtLabel = m => MONTH_NAMES[parseInt(m.slice(5)) - 1] + '/' + m.slice(2, 4);
+
   const ctx = document.getElementById('dashMonthlyChart')?.getContext('2d');
   if (!ctx) return;
 
   if (state.charts.monthly) state.charts.monthly.destroy();
 
   state.charts.monthly = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: CHART_MONTHS.map(m => m.slice(5)),
+      labels: CHART_MONTHS.map(fmtLabel),
       datasets: [
         {
           label: 'Spending',
           data: CHART_MONTHS.map(m => monthly[m] || 0),
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99,102,241,.1)',
-          tension: 0.4
+          backgroundColor: 'rgba(99,102,241,.75)',
+          borderRadius: 5,
+          borderSkipped: false
         },
         {
           label: 'Income',
           data: CHART_MONTHS.map(m => monthlyIncome[m] || 0),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,.1)',
-          tension: 0.4
+          backgroundColor: 'rgba(16,185,129,.65)',
+          borderRadius: 5,
+          borderSkipped: false
         }
       ]
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) }}}
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) }}},
+      scales: { y: { ticks: { callback: v => fmt(v) }, grid: { color: 'rgba(0,0,0,.04)' } } }
     }
   });
 }
 
 function renderTopMerchants(txns, isCurrentMonth) {
   const sums = {};
-  txns.forEach(t => {
-    sums[t.description] = (sums[t.description] || 0) + t.amount;
+  txns.filter(t => !t._isTransfer).forEach(t => {
+    sums[t.description] = (sums[t.description] || 0) + Math.abs(t.amount);
   });
 
   const top = Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 8);
@@ -1526,13 +1687,13 @@ function detectSubscriptions(txns) {
 function renderBudgetPage() {
   const month = document.getElementById('budgetMonthFilter')?.value || new Date().toISOString().slice(0, 7);
   const txns = state.transactions.filter(t => budgetMonth(t) === month);
-  const debits = txns.filter(t => t.type === 'debit');
-  const credits = txns.filter(t => t.type === 'credit');
+  const debits = txns.filter(t => !t._isIncome && !t._isTransfer);
+  const credits = txns.filter(t => t._isIncome);
 
   // Income
   const incomeByMerchant = {};
   credits.forEach(t => {
-    incomeByMerchant[t.description] = (incomeByMerchant[t.description] || 0) + t.amount;
+    incomeByMerchant[t.description] = (incomeByMerchant[t.description] || 0) + Math.abs(t.amount);
   });
 
   const incomeHtml = Object.entries(incomeByMerchant).map(([desc, amt]) =>
@@ -1540,13 +1701,13 @@ function renderBudgetPage() {
   ).join('');
   document.getElementById('monthlyIncomeList').innerHTML = incomeHtml || '<p class="text-sm text-slate-500">No income recorded</p>';
 
-  const totalIncome = credits.reduce((s, t) => s + t.amount, 0);
+  const totalIncome = credits.reduce((s, t) => s + Math.abs(t.amount), 0);
   document.getElementById('totalIncome').textContent = fmt(totalIncome);
 
   // Categories
   const catSums = {};
   debits.forEach(t => {
-    catSums[t.category] = (catSums[t.category] || 0) + t.amount;
+    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
 
   const budgetHtml = allCategories().map(cat => {
@@ -1555,24 +1716,25 @@ function renderBudgetPage() {
     const pct = budget > 0 ? (spent / budget) * 100 : 0;
     const warn = pct > 100;
 
+    const barColor = warn ? '#ef4444' : pct > 75 ? '#f59e0b' : '#6366f1';
     return `<div class="budget-row">
       <div>
         <p class="text-sm font-semibold text-slate-800">${cat}</p>
-        <p class="text-xs text-slate-500">${fmt(spent)}${budget > 0 ? ' / ' + fmt(budget) : ''}</p>
+        <p class="text-xs text-slate-500">${fmt(spent)}${budget > 0 ? ' / ' + fmt(budget) : ' · no budget set'}</p>
       </div>
-      <div class="pbar-track" style="width:60px">
-        <div class="pbar-fill" style="width:${Math.min(pct, 100)}%;background:${warn ? '#ef4444' : '#6366f1'}"></div>
+      <div class="pbar-track" style="flex:1;max-width:120px">
+        <div class="pbar-fill" style="width:${budget > 0 ? Math.min(pct, 100) : 0}%;background:${barColor}"></div>
       </div>
-      <button onclick="setBudgetForCat('${cat}')" class="text-xs text-indigo-500 hover:underline">Set</button>
+      <button onclick="setBudgetForCat('${cat}')" style="background:#eef2ff;color:#6366f1;border:none;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:600;cursor:pointer">${budget > 0 ? 'Edit' : 'Set'}</button>
     </div>`;
   }).join('');
 
   document.getElementById('budgetList').innerHTML = budgetHtml;
 
   // Fixed vs Variable
-  const fixedSum = debits.filter(t => isFixed(t)).reduce((s, t) => s + t.amount, 0);
-  const variableSum = debits.filter(t => !isFixed(t)).reduce((s, t) => s + t.amount, 0);
-  const totalDebits = debits.reduce((s, t) => s + t.amount, 0);
+  const fixedSum = debits.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const variableSum = debits.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalDebits = debits.reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const fvHtml = `<div class="fv-bar mb-4">
     <div style="flex:${fixedSum};background:#6366f1"></div>
@@ -1642,9 +1804,11 @@ function renderTransactions() {
 function populateMonthFilter() {
   const months = [...new Set(state.transactions.map(t => budgetMonth(t)).filter(Boolean))].sort().reverse();
   const current = document.getElementById('txnMonthFilter')?.value;
-  document.getElementById('txnMonthFilter').innerHTML = months.map(m =>
-    `<option value="${m}" ${m === current ? 'selected' : ''}>${new Date(m + '-01').toLocaleDateString('en', { year: 'numeric', month: 'long' })}</option>`
-  ).join('');
+  document.getElementById('txnMonthFilter').innerHTML =
+    '<option value="">All months</option>' +
+    months.map(m =>
+      `<option value="${m}" ${m === current ? 'selected' : ''}>${new Date(m + '-02').toLocaleDateString('en', { year: 'numeric', month: 'long' })}</option>`
+    ).join('');
 }
 
 function filterTransactions() {
@@ -1658,14 +1822,14 @@ function filterTransactions() {
   txns.sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const html = txns.map(t => {
-    const isIncome = t.type === 'credit';
+    const isIncome = t._isIncome;
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${t.id}')">
       <div class="flex-1">
-        <p class="font-semibold text-slate-800">${t.description}</p>
+        <p class="font-semibold text-slate-800" dir="auto">${t.description}</p>
         <p class="text-xs text-slate-500">${t.date}</p>
       </div>
       <div style="text-align:right">
-        <p class="font-semibold ${isIncome ? 'text-green-600' : 'text-slate-800'}">${isIncome ? '+' : ''}${fmt(t.amount)}</p>
+        <p class="font-semibold ${isIncome ? 'text-green-600' : 'text-red-500'}">${isIncome ? '+' : '-'}${fmt(Math.abs(t.amount))}</p>
         <p class="text-xs text-slate-500">${t.category}</p>
       </div>
       <button onclick="event.stopPropagation(); openCatModal('${t.id}')" class="text-xl text-slate-300 hover:text-slate-600 ml-2">✏</button>
@@ -1950,8 +2114,8 @@ async function sendChat() {
 
   try {
     const monthData = state.transactions.filter(t => budgetMonth(t) === new Date().toISOString().slice(0, 7));
-    const debits = monthData.filter(t => t.type === 'debit');
-    const totalSpent = debits.reduce((s, t) => s + t.amount, 0);
+    const debits = monthData.filter(t => !t._isIncome && !t._isTransfer);
+    const totalSpent = debits.reduce((s, t) => s + Math.abs(t.amount), 0);
 
     const context = `User financial data (current month):
 - Total spent: ${fmt(totalSpent)}
