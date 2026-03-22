@@ -1492,9 +1492,10 @@ function toggleFixed(txnId) {
 // RENDERING
 // ─────────────────────────────────────
 function renderDashboard() {
-  // Exclude transfers (credit card payments, bank transfers) from spending views
-  const spending = state.transactions.filter(t => t.type === 'debit' && !t._isTransfer);
-  const credits = state.transactions.filter(t => t.type === 'credit');
+  // Use category-based flags — more reliable than amount sign
+  // (credit card statements return spending as positive amounts)
+  const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
+  const credits = state.transactions.filter(t => t._isIncome);
 
   const thisMonth = new Date().toISOString().slice(0, 7);
   const thisMonthTxns = spending.filter(t => budgetMonth(t) === thisMonth);
@@ -1589,7 +1590,7 @@ function renderMonthlyChart(spending) {
   });
 
   const monthlyIncome = {};
-  state.transactions.filter(t => t.type === 'credit').forEach(t => {
+  state.transactions.filter(t => t._isIncome).forEach(t => {
     const m = budgetMonth(t);
     monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
