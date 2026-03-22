@@ -227,6 +227,41 @@ ${sample}`;
   }
 });
 
+// Chat endpoint
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, systemPrompt } = req.body;
+    if (!message) return res.status(400).json({ error: 'No message provided' });
+    if (!API_KEY) return res.status(500).json({ error: 'API key not configured' });
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt || 'You are a helpful personal finance assistant.',
+        messages: [{ role: 'user', content: message }]
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Claude API error');
+    }
+
+    const data = await response.json();
+    res.json({ reply: data.content[0].text });
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
