@@ -1270,11 +1270,12 @@ async function processPDF(file) {
         const content = await page.getTextContent();
 
         // Group text by row (same Y coordinate) for better readability
+        // pdf.js stores position in transform[5] (y), not item.y
         const rows = {};
         content.items.forEach(item => {
-          const y = Math.round(item.y);
+          const y = Math.round(item.transform ? item.transform[5] : (item.y || 0));
           if (!rows[y]) rows[y] = [];
-          rows[y].push(item.str);
+          if (item.str) rows[y].push(item.str);
         });
 
         // Join rows
