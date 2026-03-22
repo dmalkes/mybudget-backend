@@ -144,6 +144,12 @@
     .big-upload-zone{border:3px dashed #cbd5e1;border-radius:16px;padding:32px 24px;text-align:center;transition:all .2s;cursor:pointer;margin-bottom:16px}
     .big-upload-zone:hover,.big-upload-zone.drag-over{border-color:#6366f1;background:#f5f3ff}
     .big-upload-zone-icon{font-size:3rem;margin-bottom:12px}
+    /* Chat example chips */
+    .chat-example-btn{font-size:.72rem;padding:4px 10px;background:#f1f0fe;color:#6366f1;border:1px solid #c7d2fe;border-radius:99px;cursor:pointer;transition:all .15s;font-weight:500}
+    .chat-example-btn:hover{background:#e0e7ff}
+    /* Toast notification */
+    #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:10px 18px;border-radius:99px;font-size:.8rem;font-weight:600;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+    #toast.show{opacity:1}
   </style>
 </head>
 <body>
@@ -414,9 +420,12 @@
           <p id="heroIncome" class="text-xl font-bold text-emerald-300">R$0</p>
         </div>
       </div>
-      <div class="flex items-center gap-3 mt-2">
-        <span id="heroNet" class="text-white/80 text-sm"></span>
-        <span id="heroCount" class="text-white/60 text-xs"></span>
+      <div class="flex items-center justify-between mt-3">
+        <div class="flex items-center gap-3">
+          <span id="heroNet" class="text-white/80 text-sm"></span>
+          <span id="heroCount" class="text-white/60 text-xs"></span>
+        </div>
+        <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
       </div>
     </div>
 
@@ -547,7 +556,10 @@
 
   <!-- ─── PAGE: INSIGHTS ─── -->
   <div id="page-insights" class="page max-w-2xl mx-auto px-4 py-5">
-    <h2 class="text-xl font-bold text-slate-800 mt-4 mb-4">Insights</h2>
+    <div class="flex items-center justify-between mb-4 mt-4">
+      <h2 class="text-xl font-bold text-slate-800">AI Insights</h2>
+      <button onclick="renderInsights(true)" class="text-xs font-medium text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all">🔄 Regenerate</button>
+    </div>
     <div id="insightsContainer" class="space-y-3"></div>
   </div>
 
@@ -565,6 +577,10 @@
       <div class="nav-icon">📜</div>
       <span data-i18n="nav_transactions">Transactions</span>
     </div>
+    <div class="nav-btn" onclick="switchTab('insights')">
+      <div class="nav-icon">💡</div>
+      <span>Insights</span>
+    </div>
     <div class="nav-btn" onclick="toggleSettingsMenu()">
       <div class="nav-icon">⚙️</div>
       <span data-i18n="nav_settings">Settings</span>
@@ -578,18 +594,27 @@
     </button>
   </div>
 
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast"></div>
+
   <!-- AI CHAT BUTTON & PANEL -->
   <div id="chatBtn" class="grad" onclick="toggleChat()">💬</div>
   <div id="chatPanel">
     <div style="padding:18px;border-bottom:1px solid #e2e8f0;flex-shrink:0">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <h3 class="font-semibold text-slate-800">My Budget Assistant</h3>
+        <h3 class="font-semibold text-slate-800">Budget Assistant</h3>
         <button onclick="toggleChat()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#94a3b8">×</button>
+      </div>
+      <div id="chatExamples" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+        <button onclick="askExample(this)" class="chat-example-btn">📊 Where am I spending the most?</button>
+        <button onclick="askExample(this)" class="chat-example-btn">💰 How much did I save last month?</button>
+        <button onclick="askExample(this)" class="chat-example-btn">✂️ How can I reduce expenses?</button>
+        <button onclick="askExample(this)" class="chat-example-btn">📈 How is my spending trending?</button>
       </div>
     </div>
     <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px"></div>
     <div style="padding:14px;border-top:1px solid #e2e8f0;flex-shrink:0;display:flex;gap:8px">
-      <input type="text" id="chatInput" placeholder="Ask a question…" style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:.85rem;outline:none" onkeydown="if(event.key==='Enter')sendChat()">
+      <input type="text" id="chatInput" placeholder="Ask about your finances…" style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:.85rem;outline:none" onkeydown="if(event.key==='Enter')sendChat()">
       <button onclick="sendChat()" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600">Send</button>
     </div>
   </div>
@@ -1202,13 +1227,19 @@ async function processUploadedFiles() {
   if (state.files.length === 0) return;
   showProcessing();
 
+  let totalAdded = 0, totalSkipped = 0;
   try {
     for (const file of state.files) {
-      await processFile(file);
+      const result = await processFile(file);
+      if (result) { totalAdded += result.added || 0; totalSkipped += result.skipped || 0; }
     }
     saveTransactions();
     hideProcessing();
     startApp();
+    const msg = totalSkipped > 0
+      ? `✅ Added ${totalAdded} transactions (${totalSkipped} duplicates skipped)`
+      : `✅ Added ${totalAdded} transactions`;
+    showToast(msg);
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -1221,13 +1252,19 @@ async function processFiles() {
   hideUploadSheet();
   showProcessing();
 
+  let totalAdded = 0, totalSkipped = 0;
   try {
     for (const file of state.files) {
-      await processFile(file);
+      const result = await processFile(file);
+      if (result) { totalAdded += result.added || 0; totalSkipped += result.skipped || 0; }
     }
     saveTransactions();
     hideProcessing();
     renderDashboard();
+    const msg = totalSkipped > 0
+      ? `✅ Added ${totalAdded} transactions (${totalSkipped} duplicates skipped)`
+      : `✅ Added ${totalAdded} transactions`;
+    showToast(msg);
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -1322,15 +1359,25 @@ async function textToTxns(text) {
   const sample = text.split('\n').slice(0, 800).join('\n');
   const resp = await callClaude(sample);
   const parsed = resp.transactions || [];
+  let added = 0, skipped = 0;
 
   parsed.forEach(p => {
     const cat = p.category || 'Other';
+    // Duplicate check: same date + same amount + same description
+    const isDupe = state.transactions.some(e =>
+      e.date === p.date &&
+      Math.abs(e.amount - p.amount) < 0.01 &&
+      (e.originalDescription === (p.originalDescription || p.description) ||
+       e.description === p.description)
+    );
+    if (isDupe) { skipped++; return; }
+
     state.transactions.push({
       id: Math.random().toString(36).slice(2),
       date: p.date,
       billingDate: p.date,
       description: p.description,
-      originalDescription: p.description,
+      originalDescription: p.originalDescription || p.description,
       amount: p.amount,
       currency: state.onboarding.currency || 'BRL',
       type: p.amount > 0 ? 'credit' : 'debit',
@@ -1339,7 +1386,10 @@ async function textToTxns(text) {
       _isIncome: cat === 'Income',
       _isTransfer: cat === 'Transfers'
     });
+    added++;
   });
+
+  return { added, skipped };
 }
 
 function extractionPrompt(sample) {
@@ -2025,9 +2075,9 @@ function switchTab(tab) {
   const pageEl = document.getElementById('page-' + tab);
   if (pageEl) pageEl.classList.add('active');
 
-  // Highlight correct nav button (goals/insights have no visible nav button)
+  // Highlight correct nav button
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  const navMap = { overview: 0, budget: 1, transactions: 2 };
+  const navMap = { overview: 0, budget: 1, transactions: 2, insights: 3 };
   const navIdx = navMap[tab];
   if (navIdx !== undefined) {
     const btns = document.querySelectorAll('#bottomNav .nav-btn');
@@ -2093,14 +2143,120 @@ function deleteGoal(id) {
   }
 }
 
-function renderInsights() {
-  const html = `
-    <div class="card p-4 ins-info">
-      <p class="font-semibold text-slate-800 mb-1">📊 Summary</p>
-      <p class="text-sm text-slate-600">Your data has been loaded and is ready for analysis. Upload more statements to get deeper insights.</p>
-    </div>
-  `;
-  document.getElementById('insightsContainer').innerHTML = html;
+function buildFinancialContext() {
+  const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
+  const income = state.transactions.filter(t => t._isIncome);
+  const months = [...new Set(state.transactions.map(t => budgetMonth(t)).filter(Boolean))].sort();
+  const latestMonth = months.at(-1) || new Date().toISOString().slice(0, 7);
+  const currency = state.onboarding?.currencySymbol || 'R$';
+
+  const monthlyLines = months.map(m => {
+    const ms = spending.filter(t => budgetMonth(t) === m).reduce((s, t) => s + Math.abs(t.amount), 0);
+    const mi = income.filter(t => budgetMonth(t) === m).reduce((s, t) => s + Math.abs(t.amount), 0);
+    return `  ${m}: spent ${currency}${ms.toFixed(2)}, income ${currency}${mi.toFixed(2)}, net ${currency}${(mi - ms).toFixed(2)}`;
+  });
+
+  const catSums = {};
+  spending.filter(t => budgetMonth(t) === latestMonth).forEach(t => {
+    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
+  });
+  const catLines = Object.entries(catSums).sort((a,b) => b[1]-a[1])
+    .map(([c, a]) => `  ${c}: ${currency}${a.toFixed(2)}`);
+
+  const totalSpend = spending.filter(t => budgetMonth(t) === latestMonth).reduce((s,t) => s + Math.abs(t.amount), 0);
+  const totalIncome = income.filter(t => budgetMonth(t) === latestMonth).reduce((s,t) => s + Math.abs(t.amount), 0);
+
+  return `User financial data:
+Latest month (${latestMonth}):
+- Total spending: ${currency}${totalSpend.toFixed(2)}
+- Total income: ${currency}${totalIncome.toFixed(2)}
+- Net: ${currency}${(totalIncome - totalSpend).toFixed(2)}
+- Spending by category:
+${catLines.join('\n') || '  (no data)'}
+
+Monthly trend (${months.length} months available):
+${monthlyLines.join('\n') || '  (no data)'}
+
+Total transactions loaded: ${state.transactions.length}`;
+}
+
+async function callAI(message, systemPrompt) {
+  const resp = await fetch(BACKEND_URL + '/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, systemPrompt })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || resp.statusText);
+  }
+  const data = await resp.json();
+  return data.reply;
+}
+
+function askExample(btn) {
+  const q = btn.textContent.replace(/^[^\s]+\s/, ''); // strip emoji
+  document.getElementById('chatInput').value = q;
+  document.getElementById('chatInput').focus();
+  sendChat();
+}
+
+async function renderInsights(forceRefresh) {
+  const container = document.getElementById('insightsContainer');
+  if (!state.transactions.length) {
+    container.innerHTML = '<div class="card p-6 text-center text-slate-500">No transactions loaded yet. Upload a bank statement first.</div>';
+    return;
+  }
+  if (!forceRefresh && state._insightsCache) {
+    container.innerHTML = state._insightsCache;
+    return;
+  }
+
+  container.innerHTML = `<div class="card p-6 text-center">
+    <div class="spin text-3xl mb-3">⏳</div>
+    <p class="text-slate-500 text-sm">Generating AI insights…</p>
+  </div>`;
+
+  try {
+    const context = buildFinancialContext();
+    const prompt = `${context}
+
+Analyze this financial data and provide 5 concise insights. For each insight return a JSON object with:
+- type: "warning" | "opportunity" | "info" | "achievement"
+- title: short title (5 words max)
+- body: 1-2 sentence insight
+
+Return ONLY a JSON array of 5 insight objects, no other text.`;
+
+    const raw = await callAI(prompt, 'You are a personal finance analyst. Respond only with the JSON array requested.');
+    let insights;
+    try {
+      const match = raw.match(/\[[\s\S]*\]/);
+      insights = JSON.parse(match ? match[0] : raw);
+    } catch(e) {
+      throw new Error('Could not parse AI response');
+    }
+
+    const typeConfig = {
+      warning:     { border: '#f59e0b', bg: '#fffbeb', icon: '⚠️' },
+      opportunity: { border: '#10b981', bg: '#f0fdf4', icon: '💡' },
+      info:        { border: '#3b82f6', bg: '#eff6ff', icon: '📊' },
+      achievement: { border: '#8b5cf6', bg: '#faf5ff', icon: '🏆' }
+    };
+
+    const html = insights.map(ins => {
+      const cfg = typeConfig[ins.type] || typeConfig.info;
+      return `<div class="card p-4 fade-up" style="border-left:4px solid ${cfg.border};background:${cfg.bg}">
+        <p class="font-semibold text-slate-800 mb-1">${cfg.icon} ${ins.title}</p>
+        <p class="text-sm text-slate-600">${ins.body}</p>
+      </div>`;
+    }).join('');
+
+    state._insightsCache = html;
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = `<div class="card p-4 text-red-500 text-sm">Could not generate insights: ${e.message}</div>`;
+  }
 }
 
 // ─────────────────────────────────────
@@ -2120,6 +2276,9 @@ async function sendChat() {
   const msg = input.value?.trim();
   if (!msg) return;
 
+  // Hide example buttons after first message
+  document.getElementById('chatExamples').style.display = 'none';
+
   const container = document.getElementById('chatMessages');
   const userMsg = document.createElement('div');
   userMsg.className = 'chat-msg user';
@@ -2130,27 +2289,20 @@ async function sendChat() {
 
   const thinkingMsg = document.createElement('div');
   thinkingMsg.className = 'chat-msg thinking';
-  thinkingMsg.textContent = 'Thinking...';
+  thinkingMsg.textContent = 'Thinking…';
   container.appendChild(thinkingMsg);
+  container.scrollTop = container.scrollHeight;
 
   try {
-    const monthData = state.transactions.filter(t => budgetMonth(t) === new Date().toISOString().slice(0, 7));
-    const debits = monthData.filter(t => !t._isIncome && !t._isTransfer);
-    const totalSpent = debits.reduce((s, t) => s + Math.abs(t.amount), 0);
+    const context = buildFinancialContext();
+    const systemPrompt = 'You are a helpful personal finance assistant. Answer questions about the user\'s spending and budget based on the provided data. Be concise, friendly, and specific. Use the currency symbol from the data. Keep responses under 120 words.';
 
-    const context = `User financial data (current month):
-- Total spent: ${fmt(totalSpent)}
-- Transactions: ${debits.length}
-- Categories: ${[...new Set(debits.map(t => t.category))].join(', ')}`;
-
-    const resp = await callClaude([
-      { role: 'user', content: `${context}\n\nQuestion: ${msg}` }
-    ]);
+    const reply = await callAI(`${context}\n\nUser question: ${msg}`, systemPrompt);
 
     container.removeChild(thinkingMsg);
     const aiMsg = document.createElement('div');
     aiMsg.className = 'chat-msg ai';
-    aiMsg.textContent = resp;
+    aiMsg.textContent = reply;
     container.appendChild(aiMsg);
     container.scrollTop = container.scrollHeight;
   } catch (e) {
@@ -2160,7 +2312,19 @@ async function sendChat() {
     errMsg.style.color = '#ef4444';
     errMsg.textContent = 'Error: ' + e.message;
     container.appendChild(errMsg);
+    container.scrollTop = container.scrollHeight;
   }
+}
+
+// ─────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────
+function showToast(msg, duration = 3500) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
 }
 
 // ─────────────────────────────────────
