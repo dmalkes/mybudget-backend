@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(gh pr:*)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(python3 -c \"import json,sys; json.load\\(open\\(sys.argv[1]\\)\\); print\\(''valid''\\)\" \"C:\\\\Users\\\\dmalk\\\\OneDrive\\\\Documentos\\\\Claude\\\\.claude\\\\worktrees\\\\happy-jackson\\\\.claude\\\\settings.local.json\")",
+      "Bash(powershell -Command \"Get-Content ''C:\\\\Users\\\\dmalk\\\\OneDrive\\\\Documentos\\\\Claude\\\\.claude\\\\worktrees\\\\happy-jackson\\\\.claude\\\\settings.local.json'' | ConvertFrom-Json | Out-Null; Write-Host ''valid''\")"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"MyBudget has no local runtime. Preview is the live Vercel deployment at https://mybudget-api.vercel.app (auto-deploys on push to main). No local server needed.\"}'"
+          }
+        ]
+      }
+    ]
+  }
+}
