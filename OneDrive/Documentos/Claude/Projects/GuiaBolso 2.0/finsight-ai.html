@@ -1226,20 +1226,21 @@ function handleDropWelcome(e) {
 async function processUploadedFiles() {
   if (state.files.length === 0) return;
   showProcessing();
-
-  let totalAdded = 0, totalSkipped = 0;
   try {
-    for (const file of state.files) {
-      const result = await processFile(file);
-      if (result) { totalAdded += result.added || 0; totalSkipped += result.skipped || 0; }
-    }
+    // Parse all files in parallel, then merge+dedup in one pass
+    const results = await Promise.allSettled(state.files.map(f => extractCandidates(f)));
+    const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
+
+    const { added, skipped } = mergeTransactions(allCandidates);
     saveTransactions();
     hideProcessing();
     startApp();
-    const msg = totalSkipped > 0
-      ? `✅ Added ${totalAdded} transactions (${totalSkipped} duplicates skipped)`
-      : `✅ Added ${totalAdded} transactions`;
+    const msg = skipped > 0
+      ? `✅ Added ${added} transactions (${skipped} duplicates skipped)`
+      : `✅ Added ${added} transactions`;
     showToast(msg);
+    if (errors.length) console.warn('Some files failed:', errors);
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -1251,20 +1252,21 @@ async function processFiles() {
   if (state.files.length === 0) return;
   hideUploadSheet();
   showProcessing();
-
-  let totalAdded = 0, totalSkipped = 0;
   try {
-    for (const file of state.files) {
-      const result = await processFile(file);
-      if (result) { totalAdded += result.added || 0; totalSkipped += result.skipped || 0; }
-    }
+    // Parse all files in parallel, then merge+dedup in one pass
+    const results = await Promise.allSettled(state.files.map(f => extractCandidates(f)));
+    const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
+
+    const { added, skipped } = mergeTransactions(allCandidates);
     saveTransactions();
     hideProcessing();
     renderDashboard();
-    const msg = totalSkipped > 0
-      ? `✅ Added ${totalAdded} transactions (${totalSkipped} duplicates skipped)`
-      : `✅ Added ${totalAdded} transactions`;
+    const msg = skipped > 0
+      ? `✅ Added ${added} transactions (${skipped} duplicates skipped)`
+      : `✅ Added ${added} transactions`;
     showToast(msg);
+    if (errors.length) console.warn('Some files failed:', errors);
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -1272,106 +1274,127 @@ async function processFiles() {
   }
 }
 
-async function processFile(file) {
-  const type = file.type;
+// ─────────────────────────────────────
+// TEXT PRE-PROCESSING
+// ─────────────────────────────────────
+function preprocessBankText(rawText) {
+  const hasDate   = /\b\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4}\b|\b\d{4}[\/\-]\d{2}[\/\-]\d{2}\b/;
+  const hasAmount = /\b\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\b|\b\d+[.,]\d{2}\b/;
+  const isSep     = /^[\s\-=*_.#|+~]{4,}$/;
+  const isPageNum = /^\s*(page|p[aá]gina|p\.?)\s*\d+\s*(\s*(of|de)\s*\d+)?\s*$/i;
+
+  const lines = rawText.split('\n');
+  const out = [];
+  let blankRun = 0;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+
+    // Hard-skip: separators, page numbers, pure whitespace runs
+    if (!line)            { if (blankRun++ < 1) out.push(''); continue; }
+    blankRun = 0;
+    if (isSep.test(line)) continue;
+    if (isPageNum.test(line)) continue;
+
+    // Always keep lines that look like actual transaction rows
+    if (hasDate.test(line) && hasAmount.test(line)) { out.push(line); continue; }
+
+    // Keep lines with an amount (could be a continuation description or balance row)
+    if (hasAmount.test(line) && line.length >= 6)   { out.push(line); continue; }
+
+    // Keep lines with a date (partial rows, sometimes banks split date+desc+amount)
+    if (hasDate.test(line))                          { out.push(line); continue; }
+
+    // Drop very short lines without dates/amounts — almost always labels/headers
+    if (line.length < 8) continue;
+
+    // Drop lines with no digits at all (bank name, pure text headers, etc.)
+    if (!/\d/.test(line)) continue;
+
+    // Everything else that has at least some digit content — keep
+    out.push(line);
+  }
+
+  return out.join('\n');
+}
+
+// ─────────────────────────────────────
+// FILE PROCESSING — parallel-ready
+// ─────────────────────────────────────
+
+// extractCandidates: extracts text from a file and calls the backend.
+// Returns an array of raw parsed transaction objects — does NOT mutate state.
+async function extractCandidates(file) {
   const name = file.name.toLowerCase();
+  let rawText;
 
-  if (type.includes('image')) {
-    return await processImage(file);
-  } else if (name.endsWith('.pdf')) {
-    return await processPDF(file);
-  } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    return await processExcel(file);
-  } else if (name.endsWith('.csv')) {
-    return await processCSV(file);
-  }
-}
-
-async function processImage(file) {
-  const b64 = await fileToBase64(file);
-  const messages = [{
-    role: 'user',
-    content: [
-      { type: 'text', text: 'This is a screenshot of a bank statement or financial document. Extract all transactions as CSV format with columns: date, description, amount. Return ONLY the CSV data, no explanation.' },
-      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }
-    ]
-  }];
-  const resp = await callClaude(messages);
-  return await textToTxns(resp);
-}
-
-async function processPDF(file) {
-  try {
+  if (file.type.includes('image')) {
+    // Image: send to backend for vision-based extraction
     const b64 = await fileToBase64(file);
-    const pdf = await pdfjsLib.getDocument({ data: atob(b64) }).promise;
-    let text = '';
-
-    // Extract text from first 10 pages (or all if fewer)
-    for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-      try {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-
-        // Group text by row (same Y coordinate) for better readability
-        // pdf.js stores position in transform[5] (y), not item.y
-        const rows = {};
-        content.items.forEach(item => {
-          const y = Math.round(item.transform ? item.transform[5] : (item.y || 0));
-          if (!rows[y]) rows[y] = [];
-          if (item.str) rows[y].push(item.str);
-        });
-
-        // Join rows
-        Object.keys(rows).sort((a, b) => b - a).forEach(y => {
-          text += rows[y].join(' ') + '\n';
-        });
-      } catch (pageErr) {
-        console.warn(`Error extracting page ${i}:`, pageErr);
-        continue; // Skip failed pages
-      }
-    }
-
-    if (!text.trim()) {
-      throw new Error('No text could be extracted from PDF. Please use a text-based PDF with readable bank statements.');
-    }
-
-    return await textToTxns(text);
-  } catch (e) {
-    console.error('PDF processing error:', e);
-    throw new Error('Failed to process PDF: ' + e.message);
+    const resp = await callClaude(b64); // backend handles vision
+    return (resp.transactions || []);
+  } else if (name.endsWith('.pdf')) {
+    rawText = await extractPDFText(file);
+  } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab);
+    rawText = wb.SheetNames.map(sh => XLSX.utils.sheet_to_csv(wb.Sheets[sh])).join('\n');
+  } else if (name.endsWith('.csv')) {
+    rawText = await file.text();
+  } else {
+    return [];
   }
+
+  const cleaned = preprocessBankText(rawText);
+  const sample  = cleaned.split('\n').slice(0, 800).join('\n');
+  const resp    = await callClaude(sample);
+  return resp.transactions || [];
 }
 
-async function processExcel(file) {
-  const ab = await file.arrayBuffer();
-  const wb = XLSX.read(ab);
-  let text = '';
-  for (const sh of wb.SheetNames) text += XLSX.utils.sheet_to_csv(wb.Sheets[sh]) + '\n';
-  return await textToTxns(text);
+// Extract text from a PDF with parallel page processing
+async function extractPDFText(file) {
+  const b64 = await fileToBase64(file);
+  const pdf  = await pdfjsLib.getDocument({ data: atob(b64) }).promise;
+  const pageNums = Array.from({ length: Math.min(pdf.numPages, 12) }, (_, i) => i + 1);
+
+  // Fetch all pages in parallel
+  const pageTexts = await Promise.all(pageNums.map(async i => {
+    try {
+      const page    = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const rows    = {};
+      content.items.forEach(item => {
+        const y = Math.round(item.transform ? item.transform[5] : (item.y || 0));
+        if (item.str) (rows[y] = rows[y] || []).push(item.str);
+      });
+      return Object.keys(rows).sort((a, b) => b - a).map(y => rows[y].join(' ')).join('\n');
+    } catch (e) {
+      console.warn(`Page ${i} extraction failed:`, e);
+      return '';
+    }
+  }));
+
+  const combined = pageTexts.join('\n');
+  if (!combined.trim()) throw new Error('No text extracted from PDF. Use a text-based (non-scanned) PDF.');
+  return combined;
 }
 
-async function processCSV(file) {
-  const text = await file.text();
-  return await textToTxns(text);
-}
-
-async function textToTxns(text) {
-  const sample = text.split('\n').slice(0, 800).join('\n');
-  const resp = await callClaude(sample);
-  const parsed = resp.transactions || [];
+// mergeTransactions: deduplicates candidates against existing state AND
+// against each other, then pushes to state. Returns { added, skipped }.
+function mergeTransactions(candidates) {
   let added = 0, skipped = 0;
+  // Build a fast-lookup key set from existing transactions
+  const existingKeys = new Set(state.transactions.map(e =>
+    `${e.date}|${Math.round(Math.abs(e.amount) * 100)}|${(e.originalDescription || e.description || '').slice(0, 40)}`
+  ));
 
-  parsed.forEach(p => {
+  for (const p of candidates) {
+    if (!p.date || p.amount == null) continue;
+    const key = `${p.date}|${Math.round(Math.abs(p.amount) * 100)}|${(p.originalDescription || p.description || '').slice(0, 40)}`;
+    if (existingKeys.has(key)) { skipped++; continue; }
+    existingKeys.add(key); // prevent intra-batch dupes
+
     const cat = p.category || 'Other';
-    // Duplicate check: same date + same amount + same description
-    const isDupe = state.transactions.some(e =>
-      e.date === p.date &&
-      Math.abs(e.amount - p.amount) < 0.01 &&
-      (e.originalDescription === (p.originalDescription || p.description) ||
-       e.description === p.description)
-    );
-    if (isDupe) { skipped++; return; }
-
     state.transactions.push({
       id: Math.random().toString(36).slice(2),
       date: p.date,
@@ -1387,38 +1410,10 @@ async function textToTxns(text) {
       _isTransfer: cat === 'Transfers'
     });
     added++;
-  });
-
+  }
   return { added, skipped };
 }
 
-function extractionPrompt(sample) {
-  const country = state.onboarding.country || 'Brazil';
-  const isBrazil = country === 'Brazil';
-  return `You are a financial data parser. Analyze this bank statement excerpt and extract ALL transactions.
-
-Bank statement sample:
-${sample}
-
-Rules:
-${isBrazil ? '- Brazilian format: dates may be DD/MM/YYYY, decimals use comma (1.234,50)' : '- Israeli format: dates may be DD.MM.YYYY, decimals use period (1234.50)'}
-- Extract: date (YYYY-MM-DD format), description, amount (positive=income, negative=expense)
-- Infer category from merchant: food, groceries, utilities, transport, subscriptions, etc.
-- Return JSON array: [{"date":"2026-01-15","description":"Merchant","amount":100,"category":"Category"}, ...]
-- Include ALL rows that look like transactions`;
-}
-
-function parseTxnResp(raw) {
-  try {
-    const a = raw.indexOf('[');
-    const b = raw.lastIndexOf(']');
-    const json = raw.slice(a, b + 1);
-    return JSON.parse(json);
-  } catch (e) {
-    console.warn('Parse error:', e);
-    return [];
-  }
-}
 
 async function callClaude(content, country = null) {
   const resp = await fetch(BACKEND_URL + '/api/parse-file', {
