@@ -93,15 +93,18 @@ app.post('/api/parse-file', async (req, res) => {
   * Amounts use period as decimal separator
   * Negative amounts (debits) are expenses; positive amounts (credits) are income
   * Common Hebrew terms and their categories:
-    - קצבת ילדים, ביטוח לאומי, גמלה = Income
-    - כרטיסי אשראי, ישראכרט, אלבר קרדיט, דיינרס קלוב, ויזה כאל, מקס = Transfers (credit card payments)
+    - קצבת ילדים, ביטוח לאומי, גמלה, משכורת, פאפאיה גלובל = Income (salary/government payments)
+    - כרטיסי אשראי, ישראכרט, אלבר קרדיט, דיינרס קלוב, ויזה כאל, מקס, כאל, מקס אי טי = Transfers (credit card payments)
     - הו"ק הלוואה, הו"ק הלו', הלוואה קרן, הלוואה ריבית = Loans & Debt (loan payments)
+    - העב', העברה, העב' לאחר נייד, רכישת שיק בנקאי, ביטול שיק בנקאי, שיק בנקאי = Transfers (bank transfers)
+    - משיכה, משיכה מבנקט, כספומט = Cash & ATM (ATM withdrawals)
+    - דירקט, דירקט מצטבר, עמלה, עמלת שיק בנקאי, עמלת חשבון = Banking Fees
     - ארנונה = Utilities (municipal tax)
     - חשמל, גז, מים, בזק, הוט, פרטנר, סלקום, אורנג = Utilities
     - שופרסל, רמי לוי, ויקטורי, יינות ביתן, מגה, AM:PM = Groceries
     - מסעדה, קפה, בית קפה, מקדונלד, בורגר קינג, שווארמה = Food & Dining
     - בתי מרקחת, סופר פארם, ניאו פארם, מכבי, קופת חולים = Health & Medical
-    - פז, סונול, דלק, גז = Transportation (fuel)
+    - פז, סונול, דלק = Transportation (fuel)
     - רכבת ישראל, דן, אגד = Transportation
     - אמזון, עלי אקספרס, זארה, H&M = Shopping
     - נטפליקס, ספוטיפיי, אפל, גוגל = Subscriptions & Software
