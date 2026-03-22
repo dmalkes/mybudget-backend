@@ -47,7 +47,7 @@ function extractJSON(text) {
 // Runs AFTER Claude parses — overrides categories for known Hebrew patterns
 function hebrewPostProcess(transactions) {
   return transactions.map(t => {
-    const d = t.description || '';
+    const d = t.originalDescription || t.description || '';
     const isCredit = t.amount > 0;
 
     // Credit card companies → Transfers (geresh ׳ and apostrophe ' both covered by .)
@@ -126,7 +126,7 @@ async function callClaude(prompt) {
 // Parse file endpoint
 app.post('/api/parse-file', async (req, res) => {
   try {
-    const { content, country = 'Brazil' } = req.body;
+    const { content, country = 'Brazil', language = 'English' } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: 'No content provided' });
@@ -172,9 +172,11 @@ app.post('/api/parse-file', async (req, res) => {
 
 IMPORTANT: Respond with ONLY a valid JSON array. No explanation, no markdown, just the JSON array.
 
-Format: [{"date":"YYYY-MM-DD","description":"Merchant name","amount":number,"category":"Category"}]
+Format: [{"date":"YYYY-MM-DD","description":"Merchant name in ${language}","originalDescription":"exact text from statement","amount":number,"category":"Category"}]
 - amount: negative for expenses, positive for income
 - date: always YYYY-MM-DD format
+- description: translate the merchant/description name to ${language}
+- originalDescription: the exact original text from the bank statement (do not translate)
 ${brazilGuide}${israelGuide}
 - category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Travel, Education, Home & Garden, Personal Care, Insurance, Business Services, Loans & Debt, Housing, Transfers, Refunds & Credits, Income, Cash & ATM, Banking Fees, Other
 - Use context clues to categorize even if the description is in Hebrew or another language
