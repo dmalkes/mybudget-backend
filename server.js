@@ -2,12 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
+const path = require('path');
+
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.text({ limit: '50mb' }));
+
+// Serve the frontend app
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Get API key from environment variable
 const API_KEY = process.env.ANTHROPIC_API_KEY;
