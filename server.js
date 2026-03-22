@@ -139,8 +139,8 @@ app.post('/api/parse-file', async (req, res) => {
     const isBrazil = country === 'Brazil';
     const isIsrael = country === 'Israel';
 
-    // Truncate content to avoid token limits (keep first 3000 chars)
-    const sample = content.slice(0, 3000);
+    // Truncate content to avoid token limits (keep first 8000 chars)
+    const sample = content.slice(0, 8000);
 
     const israelGuide = isIsrael ? `
 - Israeli bank statement specifics:
@@ -176,7 +176,7 @@ Format: [{"date":"YYYY-MM-DD","description":"Merchant name","amount":number,"cat
 - amount: negative for expenses, positive for income
 - date: always YYYY-MM-DD format
 ${brazilGuide}${israelGuide}
-- category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Housing, Loans & Debt, Transfers, Income, Other
+- category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Travel, Education, Home & Garden, Personal Care, Insurance, Business Services, Loans & Debt, Housing, Transfers, Refunds & Credits, Income, Cash & ATM, Banking Fees, Other
 - Use context clues to categorize even if the description is in Hebrew or another language
 
 Bank statement:

@@ -1194,11 +1194,12 @@ async function processCSV(file) {
 }
 
 async function textToTxns(text) {
-  const sample = text.split('\n').slice(0, 50).join('\n');
+  const sample = text.split('\n').slice(0, 300).join('\n');
   const resp = await callClaude(sample);
   const parsed = resp.transactions || [];
 
   parsed.forEach(p => {
+    const cat = p.category || 'Other';
     state.transactions.push({
       id: Math.random().toString(36).slice(2),
       date: p.date,
@@ -1208,10 +1209,10 @@ async function textToTxns(text) {
       amount: p.amount,
       currency: state.onboarding.currency || 'BRL',
       type: p.amount > 0 ? 'credit' : 'debit',
-      category: p.category || 'Other',
+      category: cat,
       source: 'bank',
-      _isIncome: p.amount > 0,
-      _isTransfer: false
+      _isIncome: cat === 'Income',
+      _isTransfer: cat === 'Transfers'
     });
   });
 }
