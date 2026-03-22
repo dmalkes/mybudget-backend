@@ -1102,6 +1102,7 @@ async function processFiles() {
     }
     saveTransactions();
     hideProcessing();
+    hideUploadSheet();
     renderDashboard();
   } catch (e) {
     console.error('Process error:', e);
@@ -1296,8 +1297,8 @@ function checkExistingSession() {
 function startApp() {
   document.querySelectorAll('.onboarding-page, .upload-page').forEach(p => p.classList.remove('active'));
   document.getElementById('mainApp').classList.remove('hidden');
-  renderDashboard();
   loadStorage();
+  renderDashboard();
 }
 
 function resetApp() {
@@ -1665,7 +1666,7 @@ function filterTransactions() {
     const isIncome = t.type === 'credit';
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${t.id}')">
       <div class="flex-1">
-        <p class="font-semibold text-slate-800">${t.description}</p>
+        <p class="font-semibold text-slate-800" dir="auto">${t.description}</p>
         <p class="text-xs text-slate-500">${t.date}</p>
       </div>
       <div style="text-align:right">

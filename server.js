@@ -82,9 +82,32 @@ app.post('/api/parse-file', async (req, res) => {
     }
 
     const isBrazil = country === 'Brazil';
+    const isIsrael = country === 'Israel';
 
     // Truncate content to avoid token limits (keep first 3000 chars)
     const sample = content.slice(0, 3000);
+
+    const israelGuide = isIsrael ? `
+- Israeli bank statement specifics:
+  * Dates are DD/MM/YY or DD/MM/YYYY format
+  * Amounts use period as decimal separator
+  * Negative amounts (debits) are expenses; positive amounts (credits) are income
+  * Common Hebrew terms and their categories:
+    - קצבת ילדים, ביטוח לאומי, גמלה = Income
+    - כרטיסי אשראי, ישראכרט, אלבר קרדיט, דיינרס קלוב, ויזה כאל, מקס = Transfers (credit card payments)
+    - הו"ק הלוואה, הו"ק הלו', הלוואה קרן, הלוואה ריבית = Loans & Debt (loan payments)
+    - ארנונה = Utilities (municipal tax)
+    - חשמל, גז, מים, בזק, הוט, פרטנר, סלקום, אורנג = Utilities
+    - שופרסל, רמי לוי, ויקטורי, יינות ביתן, מגה, AM:PM = Groceries
+    - מסעדה, קפה, בית קפה, מקדונלד, בורגר קינג, שווארמה = Food & Dining
+    - בתי מרקחת, סופר פארם, ניאו פארם, מכבי, קופת חולים = Health & Medical
+    - פז, סונול, דלק, גז = Transportation (fuel)
+    - רכבת ישראל, דן, אגד = Transportation
+    - אמזון, עלי אקספרס, זארה, H&M = Shopping
+    - נטפליקס, ספוטיפיי, אפל, גוגל = Subscriptions & Software
+    - שכר דירה, ועד בית = Housing` : '';
+
+    const brazilGuide = isBrazil ? '- Brazilian format: DD/MM/YYYY dates, comma decimals (1.234,50 = 1234.50)' : '';
 
     // First attempt: strict JSON prompt
     const prompt1 = `You are a financial data parser. Extract ALL transactions from this bank statement.
@@ -94,8 +117,9 @@ IMPORTANT: Respond with ONLY a valid JSON array. No explanation, no markdown, ju
 Format: [{"date":"YYYY-MM-DD","description":"Merchant name","amount":number,"category":"Category"}]
 - amount: negative for expenses, positive for income
 - date: always YYYY-MM-DD format
-${isBrazil ? '- Brazilian format: DD/MM/YYYY dates, comma decimals (1.234,50 = 1234.50)' : '- Israeli format: DD.MM.YYYY dates, period decimals'}
-- category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Housing, Income, Other
+${brazilGuide}${israelGuide}
+- category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Housing, Loans & Debt, Transfers, Income, Other
+- Use context clues to categorize even if the description is in Hebrew or another language
 
 Bank statement:
 ${sample}
