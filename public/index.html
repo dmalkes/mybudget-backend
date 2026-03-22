@@ -1492,15 +1492,16 @@ function toggleFixed(txnId) {
 // RENDERING
 // ─────────────────────────────────────
 function renderDashboard() {
-  const debits = state.transactions.filter(t => t.type === 'debit');
+  // Exclude transfers (credit card payments, bank transfers) from spending views
+  const spending = state.transactions.filter(t => t.type === 'debit' && !t._isTransfer);
   const credits = state.transactions.filter(t => t.type === 'credit');
 
   const thisMonth = new Date().toISOString().slice(0, 7);
-  const thisMonthTxns = debits.filter(t => budgetMonth(t) === thisMonth);
+  const thisMonthTxns = spending.filter(t => budgetMonth(t) === thisMonth);
   const thisMonthIncome = credits.filter(t => budgetMonth(t) === thisMonth);
 
-  const totalSpent = thisMonthTxns.reduce((s, t) => s + t.amount, 0);
-  const totalIncome = thisMonthIncome.reduce((s, t) => s + t.amount, 0);
+  const totalSpent = thisMonthTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalIncome = thisMonthIncome.reduce((s, t) => s + Math.abs(t.amount), 0);
 
   document.getElementById('heroTotal').textContent = fmt(totalSpent);
   document.getElementById('heroCount').textContent = `${thisMonthTxns.length} transactions`;
@@ -1515,16 +1516,16 @@ function renderDashboard() {
   // Category chart
   const catSums = {};
   thisMonthTxns.forEach(t => {
-    catSums[t.category] = (catSums[t.category] || 0) + t.amount;
+    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
   renderCategoryChart(catSums);
 
   // Monthly chart
-  renderMonthlyChart(debits);
+  renderMonthlyChart(spending);
 
   // Fixed vs Variable
-  const fixedSum = thisMonthTxns.filter(t => isFixed(t)).reduce((s, t) => s + t.amount, 0);
-  const variableSum = thisMonthTxns.filter(t => !isFixed(t)).reduce((s, t) => s + t.amount, 0);
+  const fixedSum = thisMonthTxns.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const variableSum = thisMonthTxns.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
   const fvHtml = `<div class="fv-bar mb-2">
     <div style="flex:${fixedSum};background:#6366f1"></div>
     <div style="flex:${variableSum};background:#f59e0b"></div>
@@ -1580,11 +1581,11 @@ function renderCategoryChart(catSums) {
   });
 }
 
-function renderMonthlyChart(debits) {
+function renderMonthlyChart(spending) {
   const monthly = {};
-  debits.forEach(t => {
+  spending.forEach(t => {
     const m = budgetMonth(t);
-    monthly[m] = (monthly[m] || 0) + t.amount;
+    monthly[m] = (monthly[m] || 0) + Math.abs(t.amount);
   });
 
   const monthlyIncome = {};
@@ -1593,44 +1594,53 @@ function renderMonthlyChart(debits) {
     monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
 
-  const CHART_MONTHS = ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'];
+  // Dynamic last 6 months
+  const now = new Date();
+  const CHART_MONTHS = Array.from({length: 6}, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    return d.toISOString().slice(0, 7);
+  });
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmtLabel = m => MONTH_NAMES[parseInt(m.slice(5)) - 1] + '/' + m.slice(2, 4);
+
   const ctx = document.getElementById('dashMonthlyChart')?.getContext('2d');
   if (!ctx) return;
 
   if (state.charts.monthly) state.charts.monthly.destroy();
 
   state.charts.monthly = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: CHART_MONTHS.map(m => m.slice(5)),
+      labels: CHART_MONTHS.map(fmtLabel),
       datasets: [
         {
           label: 'Spending',
           data: CHART_MONTHS.map(m => monthly[m] || 0),
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99,102,241,.1)',
-          tension: 0.4
+          backgroundColor: 'rgba(99,102,241,.75)',
+          borderRadius: 5,
+          borderSkipped: false
         },
         {
           label: 'Income',
           data: CHART_MONTHS.map(m => monthlyIncome[m] || 0),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,.1)',
-          tension: 0.4
+          backgroundColor: 'rgba(16,185,129,.65)',
+          borderRadius: 5,
+          borderSkipped: false
         }
       ]
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) }}}
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) }}},
+      scales: { y: { ticks: { callback: v => fmt(v) }, grid: { color: 'rgba(0,0,0,.04)' } } }
     }
   });
 }
 
 function renderTopMerchants(txns, isCurrentMonth) {
   const sums = {};
-  txns.forEach(t => {
-    sums[t.description] = (sums[t.description] || 0) + t.amount;
+  txns.filter(t => !t._isTransfer).forEach(t => {
+    sums[t.description] = (sums[t.description] || 0) + Math.abs(t.amount);
   });
 
   const top = Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 8);
