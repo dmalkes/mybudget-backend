@@ -353,6 +353,14 @@
   </div>
 </div>
 
+<!-- PROCESSING OVERLAY (outside mainApp so it works during upload too) -->
+<div id="processingOverlay" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center px-8" style="background:rgba(248,250,252,.97);z-index:200">
+  <div class="grad w-20 h-20 rounded-full flex items-center justify-center mb-6" style="box-shadow:0 8px 32px rgba(99,102,241,.4)">
+    <svg class="spin w-9 h-9 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3.5"/><path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z"/></svg>
+  </div>
+  <p id="procMessage" class="text-lg font-semibold text-slate-700" style="min-height:1.8em;transition:opacity .3s"></p>
+</div>
+
 <!-- ══════════════ MAIN APP ══════════════ -->
 <div id="mainApp" class="hidden">
 
@@ -389,14 +397,6 @@
       <button id="uploadProcessBtn" onclick="processFiles()" class="hidden grad w-full text-white py-3 rounded-xl font-semibold text-sm">✨ Analyze with AI</button>
       <p id="uploadApiWarning" class="hidden text-xs text-center text-amber-600 mt-2">⚠ API key required for new uploads.</p>
     </div>
-  </div>
-
-  <!-- PROCESSING OVERLAY -->
-  <div id="processingOverlay" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center px-8" style="background:rgba(248,250,252,.97);z-index:200">
-    <div class="grad w-20 h-20 rounded-full flex items-center justify-center mb-6" style="box-shadow:0 8px 32px rgba(99,102,241,.4)">
-      <svg class="spin w-9 h-9 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3.5"/><path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z"/></svg>
-    </div>
-    <p id="procMessage" class="text-lg font-semibold text-slate-700" style="min-height:1.8em;transition:opacity .3s"></p>
   </div>
 
   <!-- ─── PAGE: OVERVIEW ─── -->
