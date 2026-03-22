@@ -43,6 +43,45 @@ function extractJSON(text) {
   return null;
 }
 
+// Deterministic post-processing for Hebrew bank transactions
+// Runs AFTER Claude parses — overrides categories for known Hebrew patterns
+function hebrewPostProcess(transactions) {
+  return transactions.map(t => {
+    const d = t.description || '';
+    const isCredit = t.amount > 0;
+
+    // Credit card companies → Transfers (geresh ׳ and apostrophe ' both covered by .)
+    if (/ישראכרט|אלבר קרדיט|דיינרס קלוב|ויזה כאל|כרטיסי אשראי|מקס אי.טי|כאל/.test(d))
+      return { ...t, category: 'Transfers' };
+
+    // Loan payments → Loans & Debt
+    if (/הו.ק.*הלוו?א|הלוואה קרן|הלוואה ריבית|הלו.*ריבית|הלו.*קרן/.test(d))
+      return { ...t, category: 'Loans & Debt' };
+
+    // Bank transfers & cheques → Transfers (or Refunds if positive)
+    if (/שיק בנקאי|רכישת שיק|ביטול שיק|העב.? לאחר|העברה/.test(d))
+      return { ...t, category: isCredit ? 'Refunds & Credits' : 'Transfers' };
+
+    // ATM / cash withdrawals → Cash & ATM
+    if (/משיכה|בנקט|כספומט/.test(d))
+      return { ...t, category: 'Cash & ATM' };
+
+    // Bank fees → Banking Fees
+    if (/דירקט|עמלת? שיק|עמלת? חשבון|עמלת? מסגרת|עמלה/.test(d))
+      return { ...t, category: 'Banking Fees' };
+
+    // Government allowances → Income
+    if (/קצבת ילדים|ביטוח לאומי|גמלה/.test(d))
+      return { ...t, category: 'Income' };
+
+    // Papaya Global (payroll platform) — positive=salary in, negative=payroll out
+    if (/פאפאיה/.test(d))
+      return { ...t, category: isCredit ? 'Income' : 'Transfers' };
+
+    return t;
+  });
+}
+
 // Call Claude with a prompt
 async function callClaude(prompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -155,6 +194,11 @@ ${sample}`;
       return res.status(400).json({
         error: 'Could not extract transaction data. Make sure the file contains readable transaction data (not a scanned image).',
       });
+    }
+
+    // Apply deterministic Hebrew post-processing (overrides AI guesses for known patterns)
+    if (isIsrael) {
+      transactions = hebrewPostProcess(transactions);
     }
 
     res.json({ success: true, transactions });
