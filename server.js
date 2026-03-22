@@ -67,8 +67,24 @@ function hebrewPostProcess(transactions) {
       return { ...t, category: 'Cash & ATM' };
 
     // Bank fees → Banking Fees
-    if (/דירקט|עמלת? שיק|עמלת? חשבון|עמלת? מסגרת|עמלה/.test(d))
+    if (/דירקט|עמלת? שיק|עמלת? חשבון|עמלת? מסגרת|עמלה|דמי כרטיס|דמי ניהול/.test(d))
       return { ...t, category: 'Banking Fees' };
+
+    // Insurance → Insurance
+    if (/מנורה מבטחים|הפניקס|מגדל ביטוח|כלל ביטוח|הראל ביטוח|מיטב דש|ביטוח/.test(d))
+      return { ...t, category: 'Insurance' };
+
+    // Subscriptions / recurring services
+    if (/איתוראן/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+
+    // Utilities — water authority, municipalities
+    if (/איגוד ערים|מי|כנרת|מים|חשמל|גז|בזק/.test(d))
+      return { ...t, category: 'Utilities' };
+
+    // Travel — hotels, booking platforms
+    if (/booking\.com|hotel|airbnb|אירביאנדבי/i.test(d))
+      return { ...t, category: 'Travel' };
 
     // Government allowances → Income
     if (/קצבת ילדים|ביטוח לאומי|גמלה/.test(d))
