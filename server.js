@@ -139,8 +139,8 @@ app.post('/api/parse-file', async (req, res) => {
     const isBrazil = country === 'Brazil';
     const isIsrael = country === 'Israel';
 
-    // Truncate content to avoid token limits (keep first 8000 chars)
-    const sample = content.slice(0, 8000);
+    // Truncate content to avoid token limits (keep first 24000 chars)
+    const sample = content.slice(0, 24000);
 
     const israelGuide = isIsrael ? `
 - Israeli bank statement specifics:
