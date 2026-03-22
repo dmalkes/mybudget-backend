@@ -381,8 +381,8 @@
   </header>
 
   <!-- UPLOAD SHEET (slides up) -->
-  <div id="uploadSheet" class="hidden fixed inset-0 z-50 flex items-end justify-center" style="background:rgba(15,23,42,.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)hideUploadSheet()">
-    <div class="card w-full max-w-lg rounded-t-2xl p-6 pb-8">
+  <div id="uploadSheet" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(15,23,42,.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)hideUploadSheet()">
+    <div class="card w-full max-w-lg rounded-2xl p-6 mx-4" style="max-height:90vh;overflow-y:auto">
       <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5"></div>
       <h3 class="font-semibold text-slate-800 mb-4">Upload Statement</h3>
       <div id="uploadZoneMain" class="upload-zone p-8 text-center mb-3"
@@ -1212,6 +1212,7 @@ async function processUploadedFiles() {
 
 async function processFiles() {
   if (state.files.length === 0) return;
+  hideUploadSheet();
   showProcessing();
 
   try {
@@ -1220,7 +1221,6 @@ async function processFiles() {
     }
     saveTransactions();
     hideProcessing();
-    hideUploadSheet();
     renderDashboard();
   } catch (e) {
     console.error('Process error:', e);
@@ -1431,6 +1431,10 @@ function resetApp() {
 }
 
 function showUploadSheet() {
+  state.files = [];
+  document.getElementById('uploadFileList').innerHTML = '';
+  document.getElementById('uploadProcessBtn').classList.add('hidden');
+  document.getElementById('fileInputMain').value = '';
   document.getElementById('uploadSheet').classList.remove('hidden');
 }
 
@@ -1497,7 +1501,10 @@ function renderDashboard() {
   const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
   const credits = state.transactions.filter(t => t._isIncome);
 
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  // Fall back to most recent data month if current calendar month has no spending
+  const nowMonth = new Date().toISOString().slice(0, 7);
+  const spendMonths = [...new Set(spending.map(t => budgetMonth(t)).filter(Boolean))].sort();
+  const thisMonth = spendMonths.includes(nowMonth) ? nowMonth : (spendMonths.at(-1) || nowMonth);
   const thisMonthTxns = spending.filter(t => budgetMonth(t) === thisMonth);
   const thisMonthIncome = credits.filter(t => budgetMonth(t) === thisMonth);
 
@@ -1595,10 +1602,15 @@ function renderMonthlyChart(spending) {
     monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
 
-  // Dynamic last 6 months
-  const now = new Date();
+  // Dynamic last 6 months anchored to most recent data month (not today)
+  const allDataMonths = [...new Set([
+    ...spending.map(t => budgetMonth(t)),
+    ...state.transactions.filter(t => t._isIncome).map(t => budgetMonth(t))
+  ].filter(Boolean))].sort();
+  const latestDataMonth = allDataMonths.at(-1) || new Date().toISOString().slice(0, 7);
+  const latestDate = new Date(latestDataMonth + '-02'); // +02 avoids timezone edge cases
   const CHART_MONTHS = Array.from({length: 6}, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    const d = new Date(latestDate.getFullYear(), latestDate.getMonth() - 5 + i, 1);
     return d.toISOString().slice(0, 7);
   });
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1675,13 +1687,13 @@ function detectSubscriptions(txns) {
 function renderBudgetPage() {
   const month = document.getElementById('budgetMonthFilter')?.value || new Date().toISOString().slice(0, 7);
   const txns = state.transactions.filter(t => budgetMonth(t) === month);
-  const debits = txns.filter(t => t.type === 'debit');
-  const credits = txns.filter(t => t.type === 'credit');
+  const debits = txns.filter(t => !t._isIncome && !t._isTransfer);
+  const credits = txns.filter(t => t._isIncome);
 
   // Income
   const incomeByMerchant = {};
   credits.forEach(t => {
-    incomeByMerchant[t.description] = (incomeByMerchant[t.description] || 0) + t.amount;
+    incomeByMerchant[t.description] = (incomeByMerchant[t.description] || 0) + Math.abs(t.amount);
   });
 
   const incomeHtml = Object.entries(incomeByMerchant).map(([desc, amt]) =>
@@ -1689,13 +1701,13 @@ function renderBudgetPage() {
   ).join('');
   document.getElementById('monthlyIncomeList').innerHTML = incomeHtml || '<p class="text-sm text-slate-500">No income recorded</p>';
 
-  const totalIncome = credits.reduce((s, t) => s + t.amount, 0);
+  const totalIncome = credits.reduce((s, t) => s + Math.abs(t.amount), 0);
   document.getElementById('totalIncome').textContent = fmt(totalIncome);
 
   // Categories
   const catSums = {};
   debits.forEach(t => {
-    catSums[t.category] = (catSums[t.category] || 0) + t.amount;
+    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
 
   const budgetHtml = allCategories().map(cat => {
@@ -1720,9 +1732,9 @@ function renderBudgetPage() {
   document.getElementById('budgetList').innerHTML = budgetHtml;
 
   // Fixed vs Variable
-  const fixedSum = debits.filter(t => isFixed(t)).reduce((s, t) => s + t.amount, 0);
-  const variableSum = debits.filter(t => !isFixed(t)).reduce((s, t) => s + t.amount, 0);
-  const totalDebits = debits.reduce((s, t) => s + t.amount, 0);
+  const fixedSum = debits.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const variableSum = debits.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalDebits = debits.reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const fvHtml = `<div class="fv-bar mb-4">
     <div style="flex:${fixedSum};background:#6366f1"></div>
@@ -1792,9 +1804,11 @@ function renderTransactions() {
 function populateMonthFilter() {
   const months = [...new Set(state.transactions.map(t => budgetMonth(t)).filter(Boolean))].sort().reverse();
   const current = document.getElementById('txnMonthFilter')?.value;
-  document.getElementById('txnMonthFilter').innerHTML = months.map(m =>
-    `<option value="${m}" ${m === current ? 'selected' : ''}>${new Date(m + '-01').toLocaleDateString('en', { year: 'numeric', month: 'long' })}</option>`
-  ).join('');
+  document.getElementById('txnMonthFilter').innerHTML =
+    '<option value="">All months</option>' +
+    months.map(m =>
+      `<option value="${m}" ${m === current ? 'selected' : ''}>${new Date(m + '-02').toLocaleDateString('en', { year: 'numeric', month: 'long' })}</option>`
+    ).join('');
 }
 
 function filterTransactions() {
@@ -1808,7 +1822,7 @@ function filterTransactions() {
   txns.sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const html = txns.map(t => {
-    const isIncome = t.type === 'credit';
+    const isIncome = t._isIncome;
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${t.id}')">
       <div class="flex-1">
         <p class="font-semibold text-slate-800" dir="auto">${t.description}</p>
@@ -2100,8 +2114,8 @@ async function sendChat() {
 
   try {
     const monthData = state.transactions.filter(t => budgetMonth(t) === new Date().toISOString().slice(0, 7));
-    const debits = monthData.filter(t => t.type === 'debit');
-    const totalSpent = debits.reduce((s, t) => s + t.amount, 0);
+    const debits = monthData.filter(t => !t._isIncome && !t._isTransfer);
+    const totalSpent = debits.reduce((s, t) => s + Math.abs(t.amount), 0);
 
     const context = `User financial data (current month):
 - Total spent: ${fmt(totalSpent)}
