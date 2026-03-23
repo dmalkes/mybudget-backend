@@ -629,7 +629,7 @@ const doughnutCenterPlugin = {
     const cx = left + width / 2, cy = top + height / 2;
     // Scale font to the inner hole: cutout=65% of the shorter dimension
     const innerR = Math.min(width, height) / 2 * 0.65;
-    const fontSize = Math.round(Math.max(10, innerR * 0.28));
+    const fontSize = Math.round(Math.max(9, innerR * 0.22));
     ctx.save();
     ctx.font = `bold ${fontSize}px system-ui,-apple-system,sans-serif`;
     ctx.fillStyle = '#1e293b';
@@ -1665,28 +1665,26 @@ function showProcessing() {
   msgEl.style.opacity = '1';
   msgEl.textContent = msgs[i];
 
-  // Fake progress: fast to 30%, slow to 85%, hold
+  // Fake progress: eases from 0→78% over ~30s, then holds until done
   function advanceProgress() {
-    if (pct < 30) pct += 3;
-    else if (pct < 60) pct += 1.5;
-    else if (pct < 85) pct += 0.5;
-    // Hold at 85% until done
+    if (pct < 20)      pct += 1.2;   // quick start
+    else if (pct < 50) pct += 0.6;   // steady
+    else if (pct < 78) pct += 0.25;  // slowing down
+    // Hold at 78% — hideProcessing jumps to 100%
     if (bar) bar.style.width = pct + '%';
     if (pctEl) pctEl.textContent = Math.round(pct) + '%';
   }
 
   _procInterval = setInterval(() => {
-    advanceProgress();
     msgEl.style.opacity = '0';
     setTimeout(() => {
       i = (i + 1) % msgs.length;
       msgEl.textContent = msgs[i];
       msgEl.style.opacity = '1';
     }, 300);
-  }, 2500);
+  }, 3500);
 
-  // Store progress timer ref
-  _procProgressInterval = setInterval(advanceProgress, 150);
+  _procProgressInterval = setInterval(advanceProgress, 500);
 }
 
 function hideProcessing() {
@@ -1883,15 +1881,10 @@ function renderMonthlyChart(spending) {
     if (m) monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
 
-  // Dynamic last 6 months anchored to most recent data month (not today)
-  const allDataMonths = [...new Set([
-    ...spending.map(t => budgetMonth(t)),
-    ...state.transactions.filter(t => t._isIncome).map(t => t.date?.slice(0, 7))
-  ].filter(Boolean))].sort();
-  const latestDataMonth = allDataMonths.at(-1) || new Date().toISOString().slice(0, 7);
-  const latestDate = new Date(latestDataMonth + '-02'); // +02 avoids timezone edge cases
+  // Always show current calendar month + 5 months behind
+  const now = new Date();
   const CHART_MONTHS = Array.from({length: 6}, (_, i) => {
-    const d = new Date(latestDate.getFullYear(), latestDate.getMonth() - 5 + i, 1);
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
     return d.toISOString().slice(0, 7);
   });
   const MONTH_NAMES = t('months');
