@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
   res.json({ status: 'MyBudget backend running' });
 });
 
-// Try to extract JSON array from Claude response (handles code blocks too)
+// Try to extract JSON array from Claude response (handles code blocks + truncated responses)
 function extractJSON(text) {
   // Try to find JSON inside code blocks first: ```json [...] ```
   const codeBlockMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
@@ -38,6 +38,30 @@ function extractJSON(text) {
   const arrayMatch = text.match(/\[[\s\S]*\]/);
   if (arrayMatch) {
     try { return JSON.parse(arrayMatch[0]); } catch (e) {}
+  }
+
+  // Salvage truncated array: find all complete {...} objects even if array is cut off
+  // This handles the case where max_tokens is hit mid-array
+  const start = text.indexOf('[');
+  if (start !== -1) {
+    const chunk = text.slice(start);
+    const objects = [];
+    let depth = 0, inStr = false, escape = false, objStart = -1;
+    for (let i = 0; i < chunk.length; i++) {
+      const c = chunk[i];
+      if (escape) { escape = false; continue; }
+      if (c === '\\' && inStr) { escape = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') { if (depth++ === 0) objStart = i; }
+      else if (c === '}') {
+        if (--depth === 0 && objStart !== -1) {
+          try { objects.push(JSON.parse(chunk.slice(objStart, i + 1))); } catch (e) {}
+          objStart = -1;
+        }
+      }
+    }
+    if (objects.length > 0) return objects;
   }
 
   return null;
@@ -120,7 +144,8 @@ async function callClaude(prompt) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 7000,
+      max_tokens: 8000,
+      system: 'You are a precise financial data extractor. Respond ONLY with a valid JSON array. No explanations, no markdown code blocks, no text before or after the array. If a JSON array cannot be completed due to length, include as many complete transaction objects as possible.',
       messages: [{ role: 'user', content: prompt }]
     })
   });
@@ -150,8 +175,8 @@ app.post('/api/parse-file', async (req, res) => {
     const isBrazil = country === 'Brazil';
     const isIsrael = country === 'Israel';
 
-    // Truncate content to avoid token limits (keep first 24000 chars)
-    const sample = content.slice(0, 24000);
+    // Truncate content to avoid token limits (keep first 60000 chars — preprocessing already reduced noise)
+    const sample = content.slice(0, 60000);
 
     const israelGuide = isIsrael ? `
 - Israeli bank statement specifics:
