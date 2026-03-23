@@ -1087,6 +1087,13 @@ function generateMockData(country) {
     {name:'Plano Celular',cat:'Subscriptions & Software',amount:79.90},
     {name:'Concessionária Energia',cat:'Utilities',amount:220 + Math.random()*80},
     {name:'Companhia de Água',cat:'Utilities',amount:85 + Math.random()*40}
+  ] : isNetherlands ? [
+    {name:'Video Streaming',cat:'Subscriptions & Software',amount:17.99},
+    {name:'Music Streaming',cat:'Subscriptions & Software',amount:10.99},
+    {name:'Internet Provider',cat:'Utilities',amount:49.99},
+    {name:'Mobile Plan',cat:'Subscriptions & Software',amount:25},
+    {name:'Energy Provider',cat:'Utilities',amount:120 + Math.random()*40},
+    {name:'Water Company',cat:'Utilities',amount:28 + Math.random()*10}
   ] : [
     {name:'Video Streaming',cat:'Subscriptions & Software',amount:36.99},
     {name:'Cable & Internet',cat:'Subscriptions & Software',amount:110.84},
@@ -1095,13 +1102,6 @@ function generateMockData(country) {
     {name:'Video Platform',cat:'Subscriptions & Software',amount:349},
     {name:'App Subscriptions',cat:'Subscriptions & Software',amount:74.90},
     {name:'Electric Company',cat:'Utilities',amount:430 + Math.random()*200}
-  ] : isNetherlands ? [
-    {name:'Video Streaming',cat:'Subscriptions & Software',amount:17.99},
-    {name:'Music Streaming',cat:'Subscriptions & Software',amount:10.99},
-    {name:'Internet Provider',cat:'Utilities',amount:49.99},
-    {name:'Mobile Plan',cat:'Subscriptions & Software',amount:25},
-    {name:'Energy Provider',cat:'Utilities',amount:120 + Math.random()*40},
-    {name:'Water Company',cat:'Utilities',amount:28 + Math.random()*10}
   ];
 
   // Fixed monthly costs (generic names)
@@ -1109,16 +1109,16 @@ function generateMockData(country) {
     {name:'Aluguel',cat:'Housing',amount:2200},
     {name:'Condomínio',cat:'Housing',amount:450},
     {name:'Plano de Saúde',cat:'Insurance',amount:380}
-  ] : [
-    {name:'Health Insurance',cat:'Insurance',amount:168},
-    {name:'Life Insurance',cat:'Insurance',amount:39.60},
-    {name:'Bank Annual Fee',cat:'Banking Fees',amount:38.90},
-    {name:'Vehicle Tracking',cat:'Insurance',amount:70.26}
   ] : isNetherlands ? [
     {name:'Rent',cat:'Housing',amount:1350},
     {name:'Health Insurance',cat:'Insurance',amount:145},
     {name:'Municipal Tax',cat:'Utilities',amount:52},
     {name:'Home Insurance',cat:'Insurance',amount:18.50}
+  ] : [
+    {name:'Health Insurance',cat:'Insurance',amount:168},
+    {name:'Life Insurance',cat:'Insurance',amount:39.60},
+    {name:'Bank Annual Fee',cat:'Banking Fees',amount:38.90},
+    {name:'Vehicle Tracking',cat:'Insurance',amount:70.26}
   ];
 
   let txns = [];
