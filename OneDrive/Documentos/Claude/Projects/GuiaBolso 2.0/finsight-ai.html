@@ -928,7 +928,6 @@ function changeLanguage(lang) {
 // STATE
 // ─────────────────────────────────────
 const state = {
-  apiKey: '',
   language: 'English',
   onboarding: {
     country: null,
@@ -980,6 +979,17 @@ function budgetMonth(t) {
 }
 
 // ─────────────────────────────────────
+// HTML ESCAPE HELPER — use for any user-controlled text inside innerHTML
+// ─────────────────────────────────────
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // CURRENCY HELPER
 // ─────────────────────────────────────
 function fmt(amount) {
@@ -1234,8 +1244,6 @@ function loadStorage() {
     if (cc) state.customCategories = JSON.parse(cc);
     const gl = localStorage.getItem(LS.GOALS);
     if (gl) state.goals = JSON.parse(gl);
-    const ak = localStorage.getItem(LS.API_KEY);
-    if (ak) state.apiKey = ak;
     const lang = localStorage.getItem(LS.LANGUAGE);
     if (lang) state.language = lang;
   } catch(e) { console.warn('Storage load error', e); }
@@ -1276,12 +1284,6 @@ function saveFixed() {
   } catch(e) {}
 }
 
-function saveApiKey(key) {
-  try {
-    state.apiKey = key;
-    localStorage.setItem(LS.API_KEY, key);
-  } catch(e) {}
-}
 
 // ─────────────────────────────────────
 // ONBOARDING FLOW
@@ -1365,16 +1367,25 @@ function useTestData() {
 // ─────────────────────────────────────
 // UPLOAD FILE HANDLING
 // ─────────────────────────────────────
+const MAX_FILE_SIZE_MB = 30;
+
 function handleUploadFiles(files) {
   const list = document.getElementById('uploadFileList');
   list.innerHTML = '';
+
+  const oversized = Array.from(files).filter(f => f.size > MAX_FILE_SIZE_MB * 1024 * 1024);
+  if (oversized.length) {
+    alert(`File too large: ${esc(oversized[0].name)} exceeds ${MAX_FILE_SIZE_MB} MB limit.`);
+    return;
+  }
+
   state.files = Array.from(files);
 
   state.files.forEach((f, i) => {
     const ext = f.name.split('.').pop().toLowerCase();
     const item = document.createElement('div');
     item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f8fafc;border-radius:8px';
-    item.innerHTML = `<span style="font-size:.85rem;color:#475569"><span style="color:#6366f1;font-weight:600">${f.name}</span> · ${(f.size/1024).toFixed(0)}KB</span>
+    item.innerHTML = `<span style="font-size:.85rem;color:#475569"><span style="color:#6366f1;font-weight:600">${esc(f.name)}</span> · ${(f.size/1024).toFixed(0)}KB</span>
       <button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.1rem" onclick="removeFile(${i})">×</button>`;
     list.appendChild(item);
   });
@@ -1404,7 +1415,7 @@ function handleFiles(fileList, isWelcome) {
     files.forEach((f, i) => {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f8fafc;border-radius:8px';
-      item.innerHTML = `<span style="font-size:.85rem;color:#475569">${f.name}</span>
+      item.innerHTML = `<span style="font-size:.85rem;color:#475569">${esc(f.name)}</span>
         <button style="background:none;border:none;color:#94a3b8;cursor:pointer" onclick="removeFile(${i})">×</button>`;
       list.appendChild(item);
     });
@@ -2002,7 +2013,7 @@ function renderTopMerchants(txns, isCurrentMonth) {
   const max = top[0]?.[1] || 1;
 
   const html = top.map(([m, a]) => `<div class="flex justify-between items-center py-2 mb-2">
-    <span class="text-sm text-slate-600 flex-1">${m}</span>
+    <span class="text-sm text-slate-600 flex-1">${esc(m)}</span>
     <div style="flex:0 0 80px">
       <div style="width:${(a/max)*100}%;height:20px;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:4px;margin-bottom:2px"></div>
     </div>
@@ -2039,7 +2050,7 @@ function renderBudgetPage() {
   });
 
   const incomeHtml = Object.entries(incomeByMerchant).map(([desc, amt]) =>
-    `<div class="flex justify-between py-2"><span class="text-sm text-slate-600">${desc}</span><span class="font-semibold text-slate-800">${fmt(amt)}</span></div>`
+    `<div class="flex justify-between py-2"><span class="text-sm text-slate-600">${esc(desc)}</span><span class="font-semibold text-slate-800">${fmt(amt)}</span></div>`
   ).join('');
   document.getElementById('monthlyIncomeList').innerHTML = incomeHtml || `<p class="text-sm text-slate-500">${t('budget_no_income')}</p>`;
 
@@ -2193,7 +2204,7 @@ function filterTransactions() {
     const isPositive = txn.amount > 0;
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${txn.id}')">
       <div class="flex-1 min-w-0 mr-2">
-        <p class="font-semibold text-slate-800 truncate" dir="auto">${txn.description}</p>
+        <p class="font-semibold text-slate-800 truncate" dir="auto">${esc(txn.description)}</p>
         <p class="text-xs text-slate-500">${txn.date}</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
@@ -2547,15 +2558,15 @@ Respond in ${lang}. Return ONLY the JSON array.`;
     const html = insights.map(ins => {
       const cfg = typeConfig[ins.type] || typeConfig.info;
       return `<div class="card p-4 fade-up" style="border-left:4px solid ${cfg.border};background:${cfg.bg}">
-        <p class="font-semibold text-slate-800 mb-1">${cfg.icon} ${ins.title}</p>
-        <p class="text-sm text-slate-600">${ins.body}</p>
+        <p class="font-semibold text-slate-800 mb-1">${cfg.icon} ${esc(ins.title)}</p>
+        <p class="text-sm text-slate-600">${esc(ins.body)}</p>
       </div>`;
     }).join('');
 
     state._insightsCache = html;
     container.innerHTML = html;
   } catch(e) {
-    container.innerHTML = `<div class="card p-4 text-red-500 text-sm">${t('insights_error')} ${e.message}</div>`;
+    container.innerHTML = `<div class="card p-4 text-red-500 text-sm">${t('insights_error')}</div>`;
   }
 }
 
