@@ -67,6 +67,87 @@ function extractJSON(text) {
   return null;
 }
 
+// Deterministic post-processing for Dutch bank transactions
+// Runs AFTER Claude parses — overrides categories for known Dutch patterns
+function dutchPostProcess(transactions) {
+  return transactions.map(t => {
+    const d = (t.orig || t.originalDescription || t.description || '').toLowerCase();
+    const isCredit = t.amount > 0;
+
+    // Salary / payroll credits → Income
+    if (isCredit && /salaris|loon|vakantiegeld|dertiende maand|bonus|netto loon/.test(d))
+      return { ...t, category: 'Income' };
+
+    // Government benefits → Income
+    if (isCredit && /uwv|svb|kinderbijslag|zorgtoeslag|huurtoeslag|belastingdienst.*terug|toeslagen/.test(d))
+      return { ...t, category: 'Income' };
+
+    // iDEAL / bank transfers → Transfers
+    if (/ideal|overboeking|overschrijving/.test(d) && !isCredit)
+      return { ...t, category: 'Transfers' };
+
+    // Incasso (direct debit) — leave to AI, but fix common patterns below
+
+    // Rent / mortgage → Housing
+    if (/huur|hypotheek|vve bijdrage|servicekosten woning/.test(d))
+      return { ...t, category: 'Housing' };
+
+    // Utilities — energy, water, internet, phone
+    if (/eneco|vattenfall|nuon|essent|greenchoice|budget energie|oxxio|energiedirect/.test(d))
+      return { ...t, category: 'Utilities' };
+    if (/vitens|evides|dunea|waternet|waterleidingbedrijf/.test(d))
+      return { ...t, category: 'Utilities' };
+    if (/ziggo|kpn|t-mobile thuis|odido thuis|xs4all/.test(d))
+      return { ...t, category: 'Utilities' };
+
+    // Mobile phone → Utilities
+    if (/t-mobile|odido|vodafone|ben mobiel|simyo|hollandsnieuwe/.test(d))
+      return { ...t, category: 'Utilities' };
+
+    // Health insurance → Insurance
+    if (/zorgverzekering|menzis|cz groep|vgz|achmea|zilveren kruis|ditzo zorg|interpolis zorg/.test(d))
+      return { ...t, category: 'Insurance' };
+
+    // Other insurance → Insurance
+    if (/verzekering|centraal beheer|nationale nederlanden|aegon|allianz/.test(d))
+      return { ...t, category: 'Insurance' };
+
+    // Groceries → Groceries
+    if (/albert heijn|jumbo|lidl|aldi|plus supermarkt|dirk|coop supermarkt|picnic|hoogvliet/.test(d))
+      return { ...t, category: 'Groceries' };
+
+    // Fuel → Transportation
+    if (/shell|bp |texaco|tango|tinq|esso|tamoil/.test(d))
+      return { ...t, category: 'Transportation' };
+
+    // Public transport → Transportation
+    if (/ns |ov-chipkaart|gvb|ret |htm |connexxion|arriva|transdev|qbuzz/.test(d))
+      return { ...t, category: 'Transportation' };
+
+    // Ride sharing / taxi → Transportation
+    if (/uber|bolt taxi|coolblue taxi/.test(d))
+      return { ...t, category: 'Transportation' };
+
+    // Municipal tax → Utilities
+    if (/gemeente|gemeentebelastingen|waterschapsbelasting/.test(d))
+      return { ...t, category: 'Utilities' };
+
+    // Bank fees → Banking Fees
+    if (/bunq|ing bank kosten|rabo kosten|abnamro kosten|servicekosten rekening|betaalrekening kosten/.test(d))
+      return { ...t, category: 'Banking Fees' };
+
+    // ATM withdrawals → Cash & ATM
+    if (/geldautomaat|geldopname|atm/.test(d))
+      return { ...t, category: 'Cash & ATM' };
+
+    // Subscriptions → Subscriptions & Software
+    if (/netflix|spotify|disney\+|videoland|npo start|amazon prime|apple.*subscr|google.*subscr|adobe/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+
+    return t;
+  });
+}
+
 // Deterministic post-processing for Hebrew bank transactions
 // Runs AFTER Claude parses — overrides categories for known Hebrew patterns
 function hebrewPostProcess(transactions) {
@@ -180,8 +261,9 @@ app.post('/api/parse-file', async (req, res) => {
       return res.status(500).json({ error: 'API key not configured on server' });
     }
 
-    const isBrazil = country === 'Brazil';
-    const isIsrael = country === 'Israel';
+    const isBrazil      = country === 'Brazil';
+    const isIsrael      = country === 'Israel';
+    const isNetherlands = country === 'Netherlands';
 
     // Truncate content to avoid token limits (keep first 60000 chars — preprocessing already reduced noise)
     const sample = content.slice(0, 60000);
@@ -217,6 +299,33 @@ app.post('/api/parse-file', async (req, res) => {
 
     const brazilGuide = isBrazil ? '- Brazilian format: DD/MM/YYYY dates, comma decimals (1.234,50 = 1234.50)' : '';
 
+    const netherlandsGuide = isNetherlands ? `
+- Dutch bank statement specifics:
+  * Dates are DD-MM-YYYY format (e.g. 15-03-2026)
+  * Amounts use period as decimal separator; thousands separator is a period too (e.g. 1.234,56 → read as 1234.56)
+  * "Af" or "D" (Debet/Debit) = outgoing expense → negative amount
+  * "Bij" or "C" (Credit) = incoming money → positive amount
+  * iDEAL = Dutch online bank transfer (usually an expense)
+  * Incasso = direct debit (recurring expense)
+  * Overboeking = bank transfer between accounts
+  * Bijschrijving = credit / money received
+  * Afschrijving = debit / money paid
+  * Common Dutch merchants and categories:
+    - Albert Heijn, Jumbo, Lidl, Aldi, Plus, Dirk, Coop = Groceries
+    - NS, GVB, RET, HTM, Connexxion, OV-chipkaart = Transportation (public transit)
+    - Shell, BP, Texaco, Tango, Tinq = Transportation (fuel)
+    - Ziggo, KPN, T-Mobile, Odido = Utilities (internet/phone)
+    - Eneco, Vattenfall, Nuon, Essent, Greenchoice = Utilities (energy)
+    - Vitens, Evides, Dunea, Waternet = Utilities (water)
+    - Menzis, CZ, VGZ, Achmea, Zilveren Kruis = Insurance (health)
+    - Gemeente, Waterschapsbelasting = Utilities (municipal/water taxes)
+    - Netflix, Spotify, Disney+, Videoland = Subscriptions & Software
+    - Bol.com, Zalando, H&M, Zara, HEMA, Primark = Shopping
+    - Salaris, Loon, Vakantiegeld = Income (salary)
+    - Huur, Hypotheek = Housing (rent/mortgage)
+    - UWV, SVB, Kinderbijslag, Zorgtoeslag, Belastingdienst (credit) = Income (government benefit)
+    - Huisarts, Tandarts, Apotheek, Kruidvat, Etos = Health & Medical` : '';
+
     // First attempt: strict JSON prompt
     const prompt1 = `You are a financial data parser. Extract ALL transactions from this bank statement.
 
@@ -227,7 +336,7 @@ Format: [{"date":"YYYY-MM-DD","description":"Merchant","orig":"orig text (max 30
 - date: always YYYY-MM-DD format
 - description: short merchant/payee name translated to ${language} (keep it concise, max 30 chars)
 - orig: first 30 characters of the original text exactly as it appears in the statement
-${brazilGuide}${israelGuide}
+${brazilGuide}${israelGuide}${netherlandsGuide}
 - category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Travel, Education, Home & Garden, Personal Care, Insurance, Business Services, Loans & Debt, Housing, Transfers, Refunds & Credits, Income, Cash & ATM, Banking Fees, Other
 - Refunds from a specific merchant should use the SAME category as that merchant type (e.g., refund from an airline → Travel, refund from restaurant → Food & Dining, refund from store → Shopping). Only use 'Refunds & Credits' for generic/unclear refunds with no identifiable merchant category.
 - Use context clues to categorize even if the description is in Hebrew or another language
@@ -265,10 +374,9 @@ ${sample}`;
       });
     }
 
-    // Apply deterministic Hebrew post-processing (overrides AI guesses for known patterns)
-    if (isIsrael) {
-      transactions = hebrewPostProcess(transactions);
-    }
+    // Apply deterministic post-processing (overrides AI guesses for known patterns)
+    if (isIsrael)      transactions = hebrewPostProcess(transactions);
+    if (isNetherlands) transactions = dutchPostProcess(transactions);
 
     res.json({ success: true, transactions });
 
