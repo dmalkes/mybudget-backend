@@ -1878,12 +1878,11 @@ function renderMonthlyChart(spending) {
     monthly[m] = (monthly[m] || 0) + Math.abs(t.amount);
   });
 
-  // For the trend chart, income is bucketed by actual receipt date (not budget-shifted month).
-  // The salary-shift (day ≥ 25 → next month) is a budget-planning concept; showing income in
-  // the month you actually received it is more intuitive for the trend view.
+  // For the trend chart, income uses budgetMonth() so late-month salary payments
+  // (Papaya paid Jan 30 = February's salary) appear in the correct budget month.
   const monthlyIncome = {};
   state.transactions.filter(t => t._isIncome).forEach(t => {
-    const m = t.date?.slice(0, 7);
+    const m = budgetMonth(t);
     if (m) monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
 
