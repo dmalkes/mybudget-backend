@@ -91,6 +91,89 @@ function extractJSON(text) {
   return null;
 }
 
+// Deterministic post-processing for Brazilian bank/credit-card transactions
+// Runs AFTER Claude parses — overrides categories for known Brazilian patterns
+function brazilPostProcess(transactions) {
+  return transactions.map(t => {
+    const d = (t.orig || t.originalDescription || t.description || '').toLowerCase();
+    const isCredit = t.amount > 0;
+
+    // Credit card bill payment (fatura) → Transfers — NOT an expense
+    if (/pagamento\s*(fatura|cartao|cartão|agendado|debito|débito|automatico|automático)|pag\s*fatura|pgto fatura/.test(d))
+      return { ...t, category: 'Transfers' };
+
+    // Salary / payroll → Income
+    if (isCredit && /salario|salário|pagamento\s*salario|folha|payroll|vencimento|remuneracao|remuneração/.test(d))
+      return { ...t, category: 'Income' };
+
+    // Government benefits → Income
+    if (isCredit && /\binss\b|previdencia|previdência|bolsa familia|bolsa família|auxilio|auxílio|beneficio|benefício|fgts|rescisao|rescisão/.test(d))
+      return { ...t, category: 'Income' };
+
+    // PIX / TED / DOC transfers (ambiguous — leave income credits to AI, only fix outgoing)
+    if (!isCredit && /\bpix\b|\bted\b|\bdoc\b/.test(d))
+      return { ...t, category: 'Transfers' };
+
+    // ATM withdrawals → Cash & ATM
+    if (/saque|saq |caixa eletronico|caixa eletrônico|\batm\b/.test(d))
+      return { ...t, category: 'Cash & ATM' };
+
+    // Bank fees → Banking Fees
+    if (/tarifa|anuidade|taxa\s*(manutencao|manutenção|servico|serviço)|iof|juros\s*rotativo|encargo|mora/.test(d))
+      return { ...t, category: 'Banking Fees' };
+
+    // Loans → Loans & Debt
+    if (/parcela\s*(emprestimo|empréstimo|financiamento|credito|crédito)|emprestimo|empréstimo|financiamento|consignado/.test(d))
+      return { ...t, category: 'Loans & Debt' };
+
+    // Food delivery & restaurants → Food & Dining
+    if (/ifood|i\.food|rappi|uber\s*eats|ubereats|james\s*delivery|aiqfome|goomer|domino|pizza|lanchonete|restaurante|padaria|bakery|mcdonalds|mcdonald|burger\s*king|subway|outback|giraffas|habib/.test(d))
+      return { ...t, category: 'Food & Dining' };
+
+    // Ride hailing → Transportation
+    if (/\buber\b(?!\s*eats)|\b99\b|99app|cabify|indriver|buser|transfer\s*(aeroporto|airport)/.test(d))
+      return { ...t, category: 'Transportation' };
+
+    // Fuel stations → Transportation
+    if (/ipiranga|shell|br\s*distribuidora|petrobras|ale\s*combustivel|raizen|graal|posto\b/.test(d))
+      return { ...t, category: 'Transportation' };
+
+    // Public transit → Transportation
+    if (/bilhete\s*unico|bilhete único|metro\b|metrô|cptm|sptrans|rodoviaria|rodoviária|passagem|onibus|ônibus|transporte/.test(d))
+      return { ...t, category: 'Transportation' };
+
+    // Supermarkets / groceries → Groceries
+    if (/carrefour|extra\b|assai|assaí|atacadao|atacadão|prezunic|guanabara|hortifruti|pao\s*de\s*acucar|pão\s*de\s*açúcar|supermercado|mercado(?!livre|pago)|atacarejo|mundial\b|cencosud/.test(d))
+      return { ...t, category: 'Groceries' };
+
+    // E-commerce / shopping → Shopping
+    if (/mercado\s*(livre|pago)|mercadolivre|mercadopago|amazon|shopee|americanas|submarino|casas\s*bahia|magalu|magazine\s*luiza|via\s*varejo|aliexpress|shein|netshoes|centauro|dafiti|renner|riachuelo|c&a\b/.test(d))
+      return { ...t, category: 'Shopping' };
+
+    // Streaming / subscriptions → Subscriptions & Software
+    if (/netflix|spotify|amazon\s*prime|disney\+|globoplay|star\+|hbo\s*max|max\b|paramount|deezer|apple\s*(one|tv|music|arcade)|google\s*(one|play)|youtube\s*premium|adobe/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+
+    // Utilities — energy, water, telecom → Utilities
+    if (/enel\b|cemig|cpfl|energisa|coelba|elektro|light\b|eletropaulo|sabesp|copasa|caesb|sanepar|vivo\b|tim\b|claro\b|oi\b|nextel|net\b|sky\b|algar/.test(d))
+      return { ...t, category: 'Utilities' };
+
+    // Health → Health & Medical
+    if (/farmacia|farmácia|drogaria|droga\s*(raia|sil|express)|ultrafarma|medico|médico|clinica|clínica|hospital|laboratorio|laboratório|dentista|unimed|hapvida|amil|sulamerica\s*saude|bradesco\s*saude|plano\s*saude/.test(d))
+      return { ...t, category: 'Health & Medical' };
+
+    // Insurance → Insurance
+    if (/seguro(?!\s*saude)|\bsulamerica\b|\bbradesco\s*seg|\bporto\s*seguro\b|\bitau\s*seg|\bbbseg\b|mapfre|azul\s*seg/.test(d))
+      return { ...t, category: 'Insurance' };
+
+    // Housing → Housing
+    if (/aluguel|condominio|condomínio|iptu|administradora\s*(imoveis|imóveis)|taxa\s*condominio/.test(d))
+      return { ...t, category: 'Housing' };
+
+    return t;
+  });
+}
+
 // Deterministic post-processing for Dutch bank transactions
 // Runs AFTER Claude parses — overrides categories for known Dutch patterns
 function dutchPostProcess(transactions) {
@@ -325,7 +408,24 @@ app.post('/api/parse-file', parseLimiter, async (req, res) => {
     - נטפליקס, ספוטיפיי, אפל, גוגל = Subscriptions & Software
     - שכר דירה, ועד בית = Housing` : '';
 
-    const brazilGuide = isBrazil ? '- Brazilian format: DD/MM/YYYY dates, comma decimals (1.234,50 = 1234.50)' : '';
+    const brazilGuide = isBrazil ? `
+- Brazilian bank/credit-card format:
+  * Dates: DD/MM/YYYY or DD/MM (no year — infer year from statement header or surrounding context; if unknown use current year)
+  * Amounts: comma decimal, period thousands (1.234,50 = 1234.50) — always output as a plain number
+  * PAGAMENTO FATURA / PAGAMENTO CARTÃO / PGTO FATURA = credit card bill payment → category "Transfers", positive amount
+  * PIX, TED, DOC = bank transfers → category "Transfers" (unless it is clearly a salary deposit)
+  * SAQUE / Caixa Eletrônico = ATM withdrawal → category "Cash & ATM"
+  * Tarifa, Anuidade, IOF, Juros Rotativos = bank fees → category "Banking Fees"
+  * Common Brazilian merchants:
+    - iFood, Rappi, Uber Eats, James Delivery = Food & Dining
+    - Uber, 99, Cabify = Transportation
+    - Ipiranga, Shell, BR Distribuidora = Transportation (fuel)
+    - Carrefour, Extra, Assaí, Atacadão, Pão de Açúcar = Groceries
+    - Mercado Livre, Amazon, Shopee, Americanas, Magazine Luiza = Shopping
+    - Netflix, Spotify, Disney+, Globoplay, Amazon Prime = Subscriptions & Software
+    - Vivo, TIM, Claro, Oi, NET = Utilities
+    - ENEL, CEMIG, CPFL, SABESP = Utilities
+    - Drogaria, Farmácia, Droga Raia, Drogasil = Health & Medical` : '';
 
     const netherlandsGuide = isNetherlands ? `
 - Dutch bank statement specifics:
@@ -403,6 +503,7 @@ ${sample}`;
     }
 
     // Apply deterministic post-processing (overrides AI guesses for known patterns)
+    if (isBrazil)      transactions = brazilPostProcess(transactions);
     if (isIsrael)      transactions = hebrewPostProcess(transactions);
     if (isNetherlands) transactions = dutchPostProcess(transactions);
 
