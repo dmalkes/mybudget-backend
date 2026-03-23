@@ -96,6 +96,14 @@ function hebrewPostProcess(transactions) {
     if (/פאפאיה/.test(d))
       return { ...t, category: isCredit ? 'Income' : 'Transfers' };
 
+    // Bank HaPoalim RTL column-reversal fix:
+    // In this bank's PDF, employer direct payments (salary/bonus/reimbursement) appear
+    // in the חובה (debit) column due to RTL text extraction — but the balance INCREASES,
+    // proving they are credits. We detect known employer names and correct the sign + category.
+    // Pattern: company name ending in בע"מ (Ltd.) that is NOT a credit card / utility company.
+    if (/ג.ייפרוג/.test(d))
+      return { ...t, amount: Math.abs(t.amount), category: 'Income' };
+
     // Generic outgoing "העברה" (no salary keywords) → Transfers
     // Incoming "העברה" (positive) is left to AI classification — could be salary from employer
     if (/העברה/.test(d) && !isCredit)
@@ -182,6 +190,10 @@ app.post('/api/parse-file', async (req, res) => {
 - Israeli bank statement specifics:
   * Dates are DD/MM/YY or DD/MM/YYYY format
   * Amounts use period as decimal separator
+  * IMPORTANT: Bank HaPoalim PDFs extract in RTL and the חובה/זכות columns are often
+    reversed by PDF parsers. Use the running balance column to determine sign: if the
+    balance INCREASES after a transaction, it is income (positive). Do not rely solely
+    on which column (חובה/זכות) the amount appears in.
   * Negative amounts (debits) are expenses; positive amounts (credits) are income
   * Common Hebrew terms and their categories:
     - קצבת ילדים, ביטוח לאומי, גמלה, משכורת, פאפאיה גלובל = Income (salary/government payments)

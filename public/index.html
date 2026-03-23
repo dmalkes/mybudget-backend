@@ -1146,9 +1146,15 @@ function loadStorage() {
     const txns = localStorage.getItem(LS.TRANSACTIONS);
     if (txns) {
       state.transactions = JSON.parse(txns);
-      // Always re-derive flags from category so stored data stays correct
-      // even after classification-logic changes (e.g. JFrog → Income fix)
+      // Migration: fix known classification issues on stored transactions
       state.transactions.forEach(t => {
+        const d = t.originalDescription || t.description || '';
+        // Bank HaPoalim RTL fix: ג'ייפרוג (JFrog) appears in חובה column but is income
+        if (/ג.ייפרוג/i.test(d) && t.category !== 'Income') {
+          t.category = 'Income';
+          t.amount = Math.abs(t.amount);
+        }
+        // Re-derive flags from category (catches any past misclassification)
         t._isIncome   = t.category === 'Income';
         t._isTransfer = t.category === 'Transfers';
       });
