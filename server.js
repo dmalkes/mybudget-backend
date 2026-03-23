@@ -217,6 +217,7 @@ Format: [{"date":"YYYY-MM-DD","description":"Merchant","orig":"orig text (max 30
 - orig: first 30 characters of the original text exactly as it appears in the statement
 ${brazilGuide}${israelGuide}
 - category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Travel, Education, Home & Garden, Personal Care, Insurance, Business Services, Loans & Debt, Housing, Transfers, Refunds & Credits, Income, Cash & ATM, Banking Fees, Other
+- Refunds from a specific merchant should use the SAME category as that merchant type (e.g., refund from an airline → Travel, refund from restaurant → Food & Dining, refund from store → Shopping). Only use 'Refunds & Credits' for generic/unclear refunds with no identifiable merchant category.
 - Use context clues to categorize even if the description is in Hebrew or another language
 
 Bank statement:
