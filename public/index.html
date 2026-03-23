@@ -446,7 +446,7 @@
         <h3 class="font-semibold text-slate-800" data-i18n="cat_title">Top categories</h3>
         <select id="catChartMonthFilter" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer" onchange="updateCatChart()"></select>
       </div>
-      <canvas id="dashCategoryChart" style="max-height:300px"></canvas>
+      <canvas id="dashCategoryChart" style="max-height:380px"></canvas>
     </div>
 
     <!-- Subscriptions -->
@@ -1837,7 +1837,7 @@ function renderCategoryChart(catSums) {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1.2,
+      aspectRatio: 1.0,
       cutout: '65%',
       plugins: {
         legend: { position: 'bottom' },
