@@ -582,8 +582,17 @@
   </div>
 
   <!-- SETTINGS MENU -->
-  <div id="settingsMenu" style="position:fixed;top:52px;right:16px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:8px;z-index:40;display:none;min-width:140px">
-    <button onclick="resetApp()" style="width:100%;padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:.9rem;color:#dc2626;hover:background:#fee2e2;border-radius:8px;transition:background .15s">
+  <div id="settingsMenu" style="position:fixed;top:52px;right:16px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:8px;z-index:40;display:none;min-width:160px">
+    <!-- Language picker -->
+    <div style="padding:8px 12px 6px;border-bottom:1px solid #f1f5f9">
+      <p style="font-size:.7rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px" data-i18n="settings_language">Language</p>
+      <div style="display:flex;gap:6px">
+        <button id="langBtn_English"    onclick="changeLanguage('English')"    style="flex:1;padding:5px 4px;border-radius:8px;border:1.5px solid #e2e8f0;background:none;cursor:pointer;font-size:.8rem;transition:all .15s">🇺🇸 EN</button>
+        <button id="langBtn_Portuguese" onclick="changeLanguage('Portuguese')" style="flex:1;padding:5px 4px;border-radius:8px;border:1.5px solid #e2e8f0;background:none;cursor:pointer;font-size:.8rem;transition:all .15s">🇧🇷 PT</button>
+        <button id="langBtn_Hebrew"     onclick="changeLanguage('Hebrew')"     style="flex:1;padding:5px 4px;border-radius:8px;border:1.5px solid #e2e8f0;background:none;cursor:pointer;font-size:.8rem;transition:all .15s">🇮🇱 HE</button>
+      </div>
+    </div>
+    <button onclick="resetApp()" style="width:100%;padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:.9rem;color:#dc2626;border-radius:8px;transition:background .15s">
       🔄 Reset & Start Over
     </button>
   </div>
@@ -701,7 +710,7 @@ const STRINGS = {
     upload_browse:'Browse files',upload_sample:'Try with sample data',upload_analyze:'Analyze Files',
     upload_privacy:'🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.',
     proc_messages:['Importing transactions…','Reading your statement…','Categorizing expenses…','Optimizing your budget…','Almost there…',"Since it's the first use, it may take some time"],
-    nav_overview:'Overview',nav_budget:'Budget',nav_transactions:'Transactions',nav_settings:'Settings',
+    nav_overview:'Overview',nav_budget:'Budget',nav_transactions:'Transactions',nav_settings:'Settings',settings_language:'Language',
     months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     chart_spending: 'Spending', chart_income: 'Income',
     spent_this_month: 'Spent this month', income_label: 'Income',
@@ -761,7 +770,7 @@ const STRINGS = {
     upload_browse:'Procurar arquivos',upload_sample:'Testar com dados de exemplo',upload_analyze:'Analisar arquivos',
     upload_privacy:'🔒 Seus dados ficam privados. Todo o processamento é feito com segurança e seus dados financeiros nunca são armazenados em nossos servidores.',
     proc_messages:['Importando transações…','Lendo seu extrato…','Categorizando despesas…','Otimizando seu orçamento…','Quase lá…','Como é a primeira vez, pode demorar um pouco'],
-    nav_overview:'Visão Geral',nav_budget:'Orçamento',nav_transactions:'Transações',nav_settings:'Ajustes',
+    nav_overview:'Visão Geral',nav_budget:'Orçamento',nav_transactions:'Transações',nav_settings:'Ajustes',settings_language:'Idioma',
     months: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
     chart_spending: 'Gastos', chart_income: 'Renda',
     spent_this_month: 'Gasto este mês', income_label: 'Renda',
@@ -821,7 +830,7 @@ const STRINGS = {
     upload_browse:'עיון בקבצים',upload_sample:'נסה עם נתוני דוגמה',upload_analyze:'ניתוח קבצים',
     upload_privacy:'🔒 הנתונים שלך נשארים פרטיים. כל העיבוד מתבצע בצורה מאובטחת ולעולם אינו מאוחסן בשרתים שלנו.',
     proc_messages:['מייבא עסקאות…','קורא את דף החשבון…','מסווג הוצאות…','מייעל את התקציב שלך…','כמעט מוכן…','בהיות שמדובר בשימוש ראשון, זה עשוי לקחת קצת יותר זמן'],
-    nav_overview:'סקירה',nav_budget:'תקציב',nav_transactions:'עסקאות',nav_settings:'הגדרות',
+    nav_overview:'סקירה',nav_budget:'תקציב',nav_transactions:'עסקאות',nav_settings:'הגדרות',settings_language:'שפה',
     months: ['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצ'],
     chart_spending: 'הוצאות', chart_income: 'הכנסות',
     spent_this_month: 'הוצאות החודש', income_label: 'הכנסות',
@@ -904,6 +913,20 @@ function selectLanguage(btn, lang) {
   try { localStorage.setItem(LS.LANGUAGE, lang); } catch(e) {}
   applyLanguage();
   document.getElementById('nextLangBtn').disabled = false;
+}
+
+function changeLanguage(lang) {
+  state.language = lang;
+  try { localStorage.setItem(LS.LANGUAGE, lang); } catch(e) {}
+  // Highlight active language button
+  ['English','Portuguese','Hebrew'].forEach(l => {
+    const btn = document.getElementById('langBtn_' + l);
+    if (btn) btn.style.cssText = btn.style.cssText.replace(/background:[^;]+;|border-color:[^;]+;/g, '');
+    if (btn) { btn.style.background = l === lang ? '#6366f1' : ''; btn.style.color = l === lang ? 'white' : ''; btn.style.borderColor = l === lang ? '#6366f1' : '#e2e8f0'; }
+  });
+  toggleSettingsMenu(); // close menu
+  applyLanguage();
+  renderDashboard();
 }
 
 // ─────────────────────────────────────
@@ -2507,7 +2530,19 @@ function toggleChat() {
 
 function toggleSettingsMenu() {
   const menu = document.getElementById('settingsMenu');
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  const opening = menu.style.display === 'none';
+  menu.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    // Highlight the currently active language button
+    ['English','Portuguese','Hebrew'].forEach(l => {
+      const btn = document.getElementById('langBtn_' + l);
+      if (!btn) return;
+      const active = l === state.language;
+      btn.style.background   = active ? '#6366f1' : '';
+      btn.style.color        = active ? 'white'   : '';
+      btn.style.borderColor  = active ? '#6366f1' : '#e2e8f0';
+    });
+  }
 }
 
 async function sendChat() {
