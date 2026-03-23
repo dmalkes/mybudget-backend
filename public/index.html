@@ -1425,14 +1425,15 @@ function preprocessBankText(rawText) {
     // Keep lines with a date (partial rows, sometimes banks split date+desc+amount)
     if (hasDate.test(line))                          { out.push(line); continue; }
 
-    // Drop very short lines without dates/amounts — almost always labels/headers
-    if (line.length < 8) continue;
+    // Drop very short lines without dates/amounts — pure noise
+    if (line.length < 4) continue;
 
-    // Drop lines with no digits at all (bank name, pure text headers, etc.)
-    if (!/\d/.test(line)) continue;
+    // Keep reasonably long lines — merchant names / descriptions may have no digits
+    // (many bank formats put description on its own line, separate from date+amount)
+    if (line.length >= 8) { out.push(line); continue; }
 
-    // Everything else that has at least some digit content — keep
-    out.push(line);
+    // Short remaining lines: only keep if they contain a digit
+    if (/\d/.test(line)) out.push(line);
   }
 
   return out.join('\n');
@@ -2277,7 +2278,9 @@ function buildFinancialContext() {
   const latestMonth = months.at(-1) || new Date().toISOString().slice(0, 7);
   const currency = state.onboarding?.currencySymbol || 'R$';
 
-  const monthlyLines = months.map(m => {
+  // Limit to last 6 months to keep the prompt size reasonable
+  const recentMonths = months.slice(-6);
+  const monthlyLines = recentMonths.map(m => {
     const ms = spending.filter(t => budgetMonth(t) === m).reduce((s, t) => s + Math.abs(t.amount), 0);
     const mi = income.filter(t => budgetMonth(t) === m).reduce((s, t) => s + Math.abs(t.amount), 0);
     return `  ${m}: spent ${currency}${ms.toFixed(2)}, income ${currency}${mi.toFixed(2)}, net ${currency}${(mi - ms).toFixed(2)}`;
@@ -2301,10 +2304,10 @@ Latest month (${latestMonth}):
 - Spending by category:
 ${catLines.join('\n') || '  (no data)'}
 
-Monthly trend (${months.length} months available):
+Monthly trend (last ${recentMonths.length} months):
 ${monthlyLines.join('\n') || '  (no data)'}
 
-Total transactions loaded: ${state.transactions.length}`;
+Total transactions: ${state.transactions.length}`;
 }
 
 async function callAI(message, systemPrompt) {
@@ -2346,16 +2349,11 @@ async function renderInsights(forceRefresh) {
 
   try {
     const context = buildFinancialContext();
+    const lang = state.language === 'Hebrew' ? 'Hebrew' : state.language === 'Portuguese' ? 'Brazilian Portuguese' : 'English';
     const prompt = `${context}
 
-Analyze this financial data and provide 5 concise insights. For each insight return a JSON object with:
-- type: "warning" | "opportunity" | "info" | "achievement"
-- title: short title (5 words max)
-- body: 1-2 sentence insight
-
-Return ONLY a JSON array of 5 insight objects, no other text.
-
-Generate the insight titles and body text in ${state.language === 'Hebrew' ? 'Hebrew' : state.language === 'Portuguese' ? 'Brazilian Portuguese' : 'English'}.`;
+Give 4 financial insights as a JSON array. Each object: {"type":"warning"|"opportunity"|"info"|"achievement","title":"max 5 words","body":"one sentence"}
+Respond in ${lang}. Return ONLY the JSON array.`;
 
     const raw = await callAI(prompt, 'You are a personal finance analyst. Respond only with the JSON array requested.');
     let insights;
