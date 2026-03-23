@@ -1352,14 +1352,13 @@ async function processUploadedFiles() {
     const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
 
-    const { added, skipped } = mergeTransactions(allCandidates);
+    const { added, skipped, income, transfers, expenses } = mergeTransactions(allCandidates);
     saveTransactions();
     hideProcessing();
     startApp();
-    const msg = skipped > 0
-      ? `✅ Added ${added} transactions (${skipped} duplicates skipped)`
-      : `✅ Added ${added} transactions`;
-    showToast(msg);
+    const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
+    const msg = `✅ Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`;
+    showToast(msg, 5000);
     if (errors.length) console.warn('Some files failed:', errors);
   } catch (e) {
     console.error('Process error:', e);
@@ -1378,14 +1377,13 @@ async function processFiles() {
     const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
 
-    const { added, skipped } = mergeTransactions(allCandidates);
+    const { added, skipped, income, transfers, expenses } = mergeTransactions(allCandidates);
     saveTransactions();
     hideProcessing();
     renderDashboard();
-    const msg = skipped > 0
-      ? `✅ Added ${added} transactions (${skipped} duplicates skipped)`
-      : `✅ Added ${added} transactions`;
-    showToast(msg);
+    const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
+    const msg = `✅ Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`;
+    showToast(msg, 5000);
     if (errors.length) console.warn('Some files failed:', errors);
   } catch (e) {
     console.error('Process error:', e);
@@ -1467,8 +1465,7 @@ async function extractCandidates(file) {
   }
 
   const cleaned = preprocessBankText(rawText);
-  const sample  = cleaned.split('\n').slice(0, 800).join('\n');
-  const resp    = await callClaude(sample);
+  const resp    = await callClaude(cleaned);
   return resp.transactions || [];
 }
 
@@ -1501,9 +1498,9 @@ async function extractPDFText(file) {
 }
 
 // mergeTransactions: deduplicates candidates against existing state AND
-// against each other, then pushes to state. Returns { added, skipped }.
+// against each other, then pushes to state. Returns { added, skipped, income, transfers, expenses }.
 function mergeTransactions(candidates) {
-  let added = 0, skipped = 0;
+  let added = 0, skipped = 0, income = 0, transfers = 0, expenses = 0;
   // Build a fast-lookup key set from existing transactions
   const existingKeys = new Set(state.transactions.map(e =>
     `${e.date}|${Math.round(Math.abs(e.amount) * 100)}|${(e.originalDescription || e.orig || e.description || '').slice(0, 40)}`
@@ -1518,6 +1515,8 @@ function mergeTransactions(candidates) {
     existingKeys.add(key); // prevent intra-batch dupes
 
     const cat = p.category || 'Other';
+    const isIncome   = cat === 'Income';
+    const isTransfer = cat === 'Transfers';
     state.transactions.push({
       id: Math.random().toString(36).slice(2),
       date: p.date,
@@ -1529,12 +1528,15 @@ function mergeTransactions(candidates) {
       type: p.amount > 0 ? 'credit' : 'debit',
       category: cat,
       source: 'bank',
-      _isIncome: cat === 'Income',
-      _isTransfer: cat === 'Transfers'
+      _isIncome: isIncome,
+      _isTransfer: isTransfer
     });
     added++;
+    if (isIncome) income++;
+    else if (isTransfer) transfers++;
+    else expenses++;
   }
-  return { added, skipped };
+  return { added, skipped, income, transfers, expenses };
 }
 
 
