@@ -47,7 +47,7 @@ function extractJSON(text) {
 // Runs AFTER Claude parses — overrides categories for known Hebrew patterns
 function hebrewPostProcess(transactions) {
   return transactions.map(t => {
-    const d = t.originalDescription || t.description || '';
+    const d = t.orig || t.originalDescription || t.description || '';
     const isCredit = t.amount > 0;
 
     // Credit card companies → Transfers (geresh ׳ and apostrophe ' both covered by .)
@@ -109,7 +109,7 @@ async function callClaude(prompt) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4000,
+      max_tokens: 7000,
       messages: [{ role: 'user', content: prompt }]
     })
   });
@@ -172,11 +172,11 @@ app.post('/api/parse-file', async (req, res) => {
 
 IMPORTANT: Respond with ONLY a valid JSON array. No explanation, no markdown, just the JSON array.
 
-Format: [{"date":"YYYY-MM-DD","description":"Merchant name in ${language}","originalDescription":"exact text from statement","amount":number,"category":"Category"}]
+Format: [{"date":"YYYY-MM-DD","description":"Merchant","orig":"orig text (max 30 chars)","amount":number,"category":"Category"}]
 - amount: negative for expenses, positive for income
 - date: always YYYY-MM-DD format
-- description: translate the merchant/description name to ${language}
-- originalDescription: the exact original text from the bank statement (do not translate)
+- description: short merchant/payee name translated to ${language} (keep it concise, max 30 chars)
+- orig: first 30 characters of the original text exactly as it appears in the statement
 ${brazilGuide}${israelGuide}
 - category: one of: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Medical, Utilities, Subscriptions & Software, Travel, Education, Home & Garden, Personal Care, Insurance, Business Services, Loans & Debt, Housing, Transfers, Refunds & Credits, Income, Cash & ATM, Banking Fees, Other
 - Use context clues to categorize even if the description is in Hebrew or another language

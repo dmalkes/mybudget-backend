@@ -1506,12 +1506,14 @@ function mergeTransactions(candidates) {
   let added = 0, skipped = 0;
   // Build a fast-lookup key set from existing transactions
   const existingKeys = new Set(state.transactions.map(e =>
-    `${e.date}|${Math.round(Math.abs(e.amount) * 100)}|${(e.originalDescription || e.description || '').slice(0, 40)}`
+    `${e.date}|${Math.round(Math.abs(e.amount) * 100)}|${(e.originalDescription || e.orig || e.description || '').slice(0, 40)}`
   ));
 
   for (const p of candidates) {
     if (!p.date || p.amount == null) continue;
-    const key = `${p.date}|${Math.round(Math.abs(p.amount) * 100)}|${(p.originalDescription || p.description || '').slice(0, 40)}`;
+    // Support both old `originalDescription` and new compact `orig` field from backend
+    const origText = p.orig || p.originalDescription || p.description || '';
+    const key = `${p.date}|${Math.round(Math.abs(p.amount) * 100)}|${origText.slice(0, 40)}`;
     if (existingKeys.has(key)) { skipped++; continue; }
     existingKeys.add(key); // prevent intra-batch dupes
 
@@ -1521,7 +1523,7 @@ function mergeTransactions(candidates) {
       date: p.date,
       billingDate: p.date,
       description: p.description,
-      originalDescription: p.originalDescription || p.description,
+      originalDescription: origText,
       amount: p.amount,
       currency: state.onboarding.currency || 'BRL',
       type: p.amount > 0 ? 'credit' : 'debit',
