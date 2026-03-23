@@ -1036,6 +1036,27 @@ function generateMockData(country) {
     {name:'Padaria Local',cat:'Food & Dining',min:5,max:25},
     {name:'Banca de Revistas',cat:'Entertainment',min:5,max:15},
     {name:'Shopping Center',cat:'Entertainment',min:30,max:200}
+  ] : isNetherlands ? [
+    {name:'Neighbourhood Supermarket',cat:'Groceries',min:30,max:180},
+    {name:'Discount Supermarket',cat:'Groceries',min:20,max:120},
+    {name:'Fresh Produce Market',cat:'Groceries',min:10,max:60},
+    {name:'Bakery',cat:'Food & Dining',min:4,max:18},
+    {name:'Local Cafe',cat:'Food & Dining',min:5,max:25},
+    {name:'Restaurant',cat:'Food & Dining',min:20,max:80},
+    {name:'Food Delivery App',cat:'Food & Dining',min:15,max:55},
+    {name:'Train Travel',cat:'Transportation',min:10,max:80},
+    {name:'Public Transit',cat:'Transportation',min:2,max:40},
+    {name:'Fuel Station',cat:'Transportation',min:50,max:130},
+    {name:'Online Retailer',cat:'Shopping',min:15,max:300},
+    {name:'Electronics Store',cat:'Shopping',min:30,max:500},
+    {name:'Clothing Store',cat:'Shopping',min:20,max:150},
+    {name:'General Store',cat:'Shopping',min:5,max:60},
+    {name:'Pharmacy',cat:'Health & Medical',min:8,max:80},
+    {name:'GP / Clinic',cat:'Health & Medical',min:0,max:10},
+    {name:'Home & Garden Store',cat:'Home & Garden',min:15,max:200},
+    {name:'Takeaway',cat:'Food & Dining',min:12,max:45},
+    {name:'Parking',cat:'Transportation',min:2,max:25},
+    {name:'Bookshop',cat:'Entertainment',min:8,max:35}
   ] : [
     {name:'Supermarket A',cat:'Groceries',min:60,max:300},
     {name:'Discount Market',cat:'Groceries',min:50,max:250},
@@ -1087,6 +1108,13 @@ function generateMockData(country) {
     {name:'Plano Celular',cat:'Subscriptions & Software',amount:79.90},
     {name:'Concessionária Energia',cat:'Utilities',amount:220 + Math.random()*80},
     {name:'Companhia de Água',cat:'Utilities',amount:85 + Math.random()*40}
+  ] : isNetherlands ? [
+    {name:'Video Streaming',cat:'Subscriptions & Software',amount:17.99},
+    {name:'Music Streaming',cat:'Subscriptions & Software',amount:10.99},
+    {name:'Internet Provider',cat:'Utilities',amount:49.99},
+    {name:'Mobile Plan',cat:'Subscriptions & Software',amount:25},
+    {name:'Energy Provider',cat:'Utilities',amount:120 + Math.random()*40},
+    {name:'Water Company',cat:'Utilities',amount:28 + Math.random()*10}
   ] : [
     {name:'Video Streaming',cat:'Subscriptions & Software',amount:36.99},
     {name:'Cable & Internet',cat:'Subscriptions & Software',amount:110.84},
@@ -1095,13 +1123,6 @@ function generateMockData(country) {
     {name:'Video Platform',cat:'Subscriptions & Software',amount:349},
     {name:'App Subscriptions',cat:'Subscriptions & Software',amount:74.90},
     {name:'Electric Company',cat:'Utilities',amount:430 + Math.random()*200}
-  ] : isNetherlands ? [
-    {name:'Video Streaming',cat:'Subscriptions & Software',amount:17.99},
-    {name:'Music Streaming',cat:'Subscriptions & Software',amount:10.99},
-    {name:'Internet Provider',cat:'Utilities',amount:49.99},
-    {name:'Mobile Plan',cat:'Subscriptions & Software',amount:25},
-    {name:'Energy Provider',cat:'Utilities',amount:120 + Math.random()*40},
-    {name:'Water Company',cat:'Utilities',amount:28 + Math.random()*10}
   ];
 
   // Fixed monthly costs (generic names)
@@ -1109,16 +1130,16 @@ function generateMockData(country) {
     {name:'Aluguel',cat:'Housing',amount:2200},
     {name:'Condomínio',cat:'Housing',amount:450},
     {name:'Plano de Saúde',cat:'Insurance',amount:380}
-  ] : [
-    {name:'Health Insurance',cat:'Insurance',amount:168},
-    {name:'Life Insurance',cat:'Insurance',amount:39.60},
-    {name:'Bank Annual Fee',cat:'Banking Fees',amount:38.90},
-    {name:'Vehicle Tracking',cat:'Insurance',amount:70.26}
   ] : isNetherlands ? [
     {name:'Rent',cat:'Housing',amount:1350},
     {name:'Health Insurance',cat:'Insurance',amount:145},
     {name:'Municipal Tax',cat:'Utilities',amount:52},
     {name:'Home Insurance',cat:'Insurance',amount:18.50}
+  ] : [
+    {name:'Health Insurance',cat:'Insurance',amount:168},
+    {name:'Life Insurance',cat:'Insurance',amount:39.60},
+    {name:'Bank Annual Fee',cat:'Banking Fees',amount:38.90},
+    {name:'Vehicle Tracking',cat:'Insurance',amount:70.26}
   ];
 
   let txns = [];
