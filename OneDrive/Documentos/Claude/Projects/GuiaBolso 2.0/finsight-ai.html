@@ -1738,11 +1738,26 @@ function renderDashboard() {
 
 function renderCategoryChart(catSums) {
   const sorted = Object.entries(catSums).sort((a, b) => b[1] - a[1]);
-  const maxVal = sorted[0]?.[1] || 1;
   const ctx = document.getElementById('dashCategoryChart')?.getContext('2d');
   if (!ctx) return;
 
-  if (state.charts.category) state.charts.category.destroy();
+  if (state.charts.category) { state.charts.category.destroy(); state.charts.category = null; }
+
+  // No spending data → show empty state instead of blank chart
+  if (sorted.length === 0) {
+    ctx.canvas.style.display = 'none';
+    const card = ctx.canvas.closest('.card');
+    if (card && !card.querySelector('.cat-empty')) {
+      const msg = document.createElement('p');
+      msg.className = 'cat-empty text-xs text-slate-400 text-center py-4';
+      msg.textContent = 'No spending categories yet for this month';
+      card.appendChild(msg);
+    }
+    return;
+  }
+  // Restore canvas if it was hidden
+  ctx.canvas.style.display = '';
+  ctx.canvas.closest('.card')?.querySelector('.cat-empty')?.remove();
 
   state.charts.category = new Chart(ctx, {
     type: 'doughnut',
