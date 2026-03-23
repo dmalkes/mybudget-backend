@@ -95,82 +95,212 @@ function extractJSON(text) {
 // Runs AFTER Claude parses — overrides categories for known Brazilian patterns
 function brazilPostProcess(transactions) {
   return transactions.map(t => {
-    const d = (t.orig || t.originalDescription || t.description || '').toLowerCase();
+    const raw = t.orig || t.originalDescription || t.description || '';
+    // Normalize: lowercase + strip diacritics (so "PÃO DE AÇÚCAR" = "pao de acucar")
+    // Also replace * with space (Nubank uses NETFLIX*BR, SPOTIFY*12345 etc.)
+    const d = raw.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\*/g, ' ');
     const isCredit = t.amount > 0;
 
-    // Credit card bill payment (fatura) → Transfers — NOT an expense
-    if (/pagamento\s*(fatura|cartao|cartão|agendado|debito|débito|automatico|automático)|pag\s*fatura|pgto fatura/.test(d))
+    // ── TRANSFERS (bill payments — must run first, before merchant checks) ──
+    if (/pagamento\s*(fatura|cartao|agendado|debito|automatico)|pag\s*fatura|pgto\s*fatura/.test(d))
       return { ...t, category: 'Transfers' };
 
-    // Salary / payroll → Income
-    if (isCredit && /salario|salário|pagamento\s*salario|folha|payroll|vencimento|remuneracao|remuneração/.test(d))
+    // ── INCOME ────────────────────────────────────────────────────────────
+    if (isCredit && /salario|salari|folha|payroll|vencimento|remuneracao|rendimento\s*salario/.test(d))
+      return { ...t, category: 'Income' };
+    if (isCredit && /\binss\b|previdencia|bolsa\s*famil|auxilio|beneficio|fgts|rescisao/.test(d))
       return { ...t, category: 'Income' };
 
-    // Government benefits → Income
-    if (isCredit && /\binss\b|previdencia|previdência|bolsa familia|bolsa família|auxilio|auxílio|beneficio|benefício|fgts|rescisao|rescisão/.test(d))
-      return { ...t, category: 'Income' };
-
-    // ATM withdrawals → Cash & ATM
-    if (/saque|saq |caixa eletronico|caixa eletrônico|\batm\b/.test(d))
+    // ── CASH & ATM ────────────────────────────────────────────────────────
+    if (/saque|\bsaq\b|caixa\s*eletronico|\batm\b/.test(d))
       return { ...t, category: 'Cash & ATM' };
 
-    // Bank fees → Banking Fees
-    if (/tarifa|anuidade|taxa\s*(manutencao|manutenção|servico|serviço)|iof|juros\s*rotativo|encargo|mora/.test(d))
+    // ── BANKING FEES ──────────────────────────────────────────────────────
+    if (/tarifa|anuidade|taxa\s*(manutencao|servico)|iof|juros\s*rotativo|encargo\s*financ|\bmora\b/.test(d))
       return { ...t, category: 'Banking Fees' };
 
-    // Loans → Loans & Debt
-    if (/parcela\s*(emprestimo|empréstimo|financiamento|credito|crédito)|emprestimo|empréstimo|financiamento|consignado/.test(d))
+    // ── LOANS & DEBT ──────────────────────────────────────────────────────
+    if (/parcela\s*(emprestimo|financiamento|credito)|emprestimo|financiamento|consignado/.test(d))
       return { ...t, category: 'Loans & Debt' };
 
-    // Food delivery & restaurants → Food & Dining (check BEFORE PIX fallback — paid via PIX too)
-    if (/ifood|i\.food|rappi|uber\s*eats|ubereats|james\s*delivery|aiqfome|goomer|domino|pizza|lanchonete|restaurante|padaria|bakery|mcdonalds|mcdonald|burger\s*king|subway|outback|giraffas|habib/.test(d))
+    // ── FOOD DELIVERY (before PIX fallback — iFood etc. are often paid via PIX) ──
+    if (/ifood|rappi|uber\s*eats|ubereats|james\s*delivery|aiqfome|ze\s*delivery|zedeli|goomer/.test(d))
       return { ...t, category: 'Food & Dining' };
 
-    // Ride hailing → Transportation (check BEFORE PIX fallback)
-    if (/\buber\b(?!\s*eats)|\b99\b|99app|cabify|indriver|buser|transfer\s*(aeroporto|airport)/.test(d))
+    // ── TRANSPORTATION (before PIX fallback — tolls, transit, ride-hail paid via PIX) ──
+    // Ride hailing
+    if (/\buber\b(?!\s*eats)|\b99\b|99app|cabify|indriver|\bbuser\b|blablacar/.test(d))
+      return { ...t, category: 'Transportation' };
+    // Fuel
+    if (/ipiranga|\bshell\b|br\s*distribuidora|petrobras\s*(dist|br)\b|raizen|\besso\b|vibra\s*energia|\bale\b.*combust|\bgraal\b|\bposto\b|combustivel/.test(d))
+      return { ...t, category: 'Transportation' };
+    // Public transit
+    if (/bilhete\s*unico|metro\s*(sp|rj)?\b|\bcptm\b|sptrans|supervia|metrorio|\bbrt\b|trilhos\b/.test(d))
+      return { ...t, category: 'Transportation' };
+    // Bus companies & intercity
+    if (/gontijo|itapemirim|\butil\b.*tur|\bcometa\b|expresso\s*do\s*sul|reunidas|viacao|empresa\s*de\s*onibus|emp\s*onibus|\bonibus\b|rodoviaria/.test(d))
+      return { ...t, category: 'Transportation' };
+    // Tolls & tags
+    if (/autoban|\bccr\b|ecopistas|ecovias|sem\s*parar|conectcar|veloe|pedagio|portagem/.test(d))
+      return { ...t, category: 'Transportation' };
+    // Car rental & parking
+    if (/localiza|\bmovida\b|\bunidas\b|hertz|\bavis\b|estapar|multipark|indigo\s*park|estacionamento/.test(d))
+      return { ...t, category: 'Transportation' };
+    // DETRAN / licensing
+    if (/\bdetran\b|licenciamento|dpvat|ipva/.test(d))
       return { ...t, category: 'Transportation' };
 
-    // Fuel stations → Transportation
-    if (/ipiranga|shell|br\s*distribuidora|petrobras|ale\s*combustivel|raizen|graal|posto\b/.test(d))
-      return { ...t, category: 'Transportation' };
-
-    // Public transit & bus companies → Transportation (check BEFORE PIX fallback)
-    if (/bilhete\s*unico|bilhete único|metro\b|metrô|cptm|sptrans|rodoviaria|rodoviária|passagem|onibus|ônibus|transporte|empresa.*trans|viacao|viação|van\s*escolar/.test(d))
-      return { ...t, category: 'Transportation' };
-
-    // PIX / TED / DOC with no identifiable payee → Transfers (fallback, after merchant checks)
+    // ── PIX / TED / DOC fallback → Transfers (AFTER all merchant checks above) ──
     if (!isCredit && /\bpix\b|\bted\b|\bdoc\b/.test(d))
       return { ...t, category: 'Transfers' };
 
-    // Supermarkets / groceries → Groceries
-    if (/carrefour|extra\b|assai|assaí|atacadao|atacadão|prezunic|guanabara|hortifruti|pao\s*de\s*acucar|pão\s*de\s*açúcar|supermercado|mercado(?!livre|pago)|atacarejo|mundial\b|cencosud/.test(d))
+    // ── GROCERIES ─────────────────────────────────────────────────────────
+    if (/carrefour|pao\s*de\s*acucar|\bgpa\b|companhia\s*brasileira\s*de\s*dis/.test(d))
+      return { ...t, category: 'Groceries' };
+    if (/assai|atacadao|prezunic|guanabara|hortifruti/.test(d))
+      return { ...t, category: 'Groceries' };
+    // \bextra\b but NOT extra eletro
+    if (/\bextra\b/.test(d) && !/extra\s*eletro/.test(d))
+      return { ...t, category: 'Groceries' };
+    if (/cencosud|gbarbosa|\bbretas\b|mercantil\s*rodrigues/.test(d))
+      return { ...t, category: 'Groceries' };
+    if (/savegnago|\bsonda\b|zaffari|sendas|supernosso|super\s*pao|angeloni|bistek|giassi/.test(d))
+      return { ...t, category: 'Groceries' };
+    if (/fort\s*atacadista|grupo\s*mateus|bh\s*supermercados|walmart|\bsam\s*s?\s*club\b/.test(d))
+      return { ...t, category: 'Groceries' };
+    if (/mundo\s*verde|natural\s*da\s*terra|emporio/.test(d))
+      return { ...t, category: 'Groceries' };
+    if (/supermercado|hipermercado|atacarejo/.test(d))
+      return { ...t, category: 'Groceries' };
+    // Generic "mercado" but NOT mercado livre / mercado pago
+    if (/\bmercado\b/.test(d) && !/mercado\s*(livre|pago)/.test(d))
       return { ...t, category: 'Groceries' };
 
-    // E-commerce / shopping → Shopping
-    if (/mercado\s*(livre|pago)|mercadolivre|mercadopago|amazon|shopee|americanas|submarino|casas\s*bahia|magalu|magazine\s*luiza|via\s*varejo|aliexpress|shein|netshoes|centauro|dafiti|renner|riachuelo|c&a\b/.test(d))
-      return { ...t, category: 'Shopping' };
-
-    // Streaming / subscriptions → Subscriptions & Software
-    if (/netflix|spotify|amazon\s*prime|disney\+|globoplay|star\+|hbo\s*max|max\b|paramount|deezer|apple\s*(one|tv|music|arcade)|google\s*(one|play)|youtube\s*premium|adobe/.test(d))
-      return { ...t, category: 'Subscriptions & Software' };
-
-    // Utilities — energy, water, telecom → Utilities
-    if (/enel\b|cemig|cpfl|energisa|coelba|elektro|light\b|eletropaulo|sabesp|copasa|caesb|sanepar|vivo\b|tim\b|claro\b|oi\b|nextel|net\b|sky\b|algar/.test(d))
+    // ── UTILITIES ─────────────────────────────────────────────────────────
+    // Electricity (all Brazilian state distributors)
+    if (/\benel\b|cemig|\bcpfl\b|energisa|coelba|elektro|\blight\b|eletropaulo/.test(d))
+      return { ...t, category: 'Utilities' };
+    if (/celesc|\brge\b|\bcemar\b|equatorial\s*(ma|go|pa)|cosern|\bceron\b|amazonas\s*energia/.test(d))
+      return { ...t, category: 'Utilities' };
+    if (/\bceee\b|\bceb\s*dist|\bcelpa\b|\bceal\b|\bcelpe\b|\bdmed\b|coelce/.test(d))
+      return { ...t, category: 'Utilities' };
+    // Water & sanitation
+    if (/sabesp|copasa|caesb|sanepar|cagece|embasa|\bcasan\b|caern|caema|\bdeso\b|agespisa|compesa|cosama|cedae|sanesul|saneago/.test(d))
+      return { ...t, category: 'Utilities' };
+    // Telecom — mobile
+    if (/\bvivo\b|telefonica|\btim\b|\bclaro\b|\boi\s*(movel|celular|fibra|internet)?\b|nextel|algar|sercomtel|brisanet/.test(d))
+      return { ...t, category: 'Utilities' };
+    // Telecom — internet/cable (\bnet\b only with qualifier to avoid false positives)
+    if (/\bnet\s*(virtua|internet|combo)\b|\bsky\b|claro\s*(tv|net|internet)|vivo\s*(fibra|internet)|oi\s*fibra|unifique/.test(d))
+      return { ...t, category: 'Utilities' };
+    // Piped/cylinder gas
+    if (/comgas|copergas|gasmig|bahiagas|scgas|sulgas|ultragaz|supergasbras|liquigas/.test(d))
       return { ...t, category: 'Utilities' };
 
-    // Health → Health & Medical
-    if (/farmacia|farmácia|drogaria|droga\s*(raia|sil|express)|ultrafarma|medico|médico|clinica|clínica|hospital|laboratorio|laboratório|dentista|unimed|hapvida|amil|sulamerica\s*saude|bradesco\s*saude|plano\s*saude/.test(d))
+    // ── HEALTH & MEDICAL ──────────────────────────────────────────────────
+    // Pharmacies (specific chains first)
+    if (/droga\s*raia|drogaria\s*raia|drogasil|ultrafarma|pacheco|pague\s*menos|nossa\s*farmacia|panvel|nissei|venancio/.test(d))
+      return { ...t, category: 'Health & Medical' };
+    if (/droga\s*sao\s*paulo|dsaopaulo|onofre|drogao/.test(d))
+      return { ...t, category: 'Health & Medical' };
+    // Generic pharmacy
+    if (/farmacia|drogaria/.test(d))
+      return { ...t, category: 'Health & Medical' };
+    // Health insurance (plano de saúde)
+    if (/unimed|hapvida|\bamil\b|sulamerica\s*saude|bradesco\s*saude|notre\s*dame|notredame|omint|\bgndi\b|prevent\s*senior|\bgeap\b|\bcassi\b|plano\s*saude/.test(d))
+      return { ...t, category: 'Health & Medical' };
+    // Labs & hospitals
+    if (/fleury|\bdasa\b|pardini|lavoisier|einstein|sirio\s*libanes|mater\s*dei/.test(d))
+      return { ...t, category: 'Health & Medical' };
+    if (/laboratorio|\blab\b(?=\s)|clinica|hospital|consultorio|dentista|odonto|clinipam/.test(d))
       return { ...t, category: 'Health & Medical' };
 
-    // Insurance → Insurance
-    if (/seguro(?!\s*saude)|\bsulamerica\b|\bbradesco\s*seg|\bporto\s*seguro\b|\bitau\s*seg|\bbbseg\b|mapfre|azul\s*seg/.test(d))
+    // ── INSURANCE (after health — sulamerica saude → Health, sulamerica alone → Insurance) ──
+    if (/porto\s*seguro|bradesco\s*seg(?!\s*saude)|tokio\s*marine|zurich|allianz|mapfre|azul\s*seg|itau\s*seg|xp\s*seguros|\bsura\b|bbseg|bb\s*seguridade/.test(d))
+      return { ...t, category: 'Insurance' };
+    if (/sulamerica\b(?!\s*saude)|sul\s*america\b(?!\s*saude)/.test(d))
+      return { ...t, category: 'Insurance' };
+    if (/\bseguro\b(?!\s*saude)/.test(d) && !isCredit)
       return { ...t, category: 'Insurance' };
 
-    // Housing → Housing
-    if (/aluguel|condominio|condomínio|iptu|administradora\s*(imoveis|imóveis)|taxa\s*condominio/.test(d))
+    // ── SUBSCRIPTIONS & SOFTWARE ──────────────────────────────────────────
+    // Video streaming
+    if (/netflix|disney\s*\+?|disney\s*plus|hbo\s*max|star\s*\+?|star\s*plus|globoplay|paramount|crunchyroll|mubi/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+    // Music
+    if (/spotify|deezer|apple\s*music|\btidal\b/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+    // Cloud & productivity
+    if (/google\s*(one|play)|youtube\s*pre|apple\s*(one|tv|arcade)|icloud|microsoft|\bmsft\b|adobe|dropbox|github|notion|chatgpt|openai|\bcanva\b|\bzoom\b/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+    // Games
+    if (/\bsteam\b|xbox|playstation|\bpsn\b|nintendo|riot\s*games?|blizzard|\bea\s*games\b|nuuvem/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+    // News
+    if (/folha\s*digital|estadao|globo\s*\+?|\buol\b/.test(d))
+      return { ...t, category: 'Subscriptions & Software' };
+
+    // ── SHOPPING ──────────────────────────────────────────────────────────
+    // Department / e-commerce
+    if (/magalu|magazine\s*luiza|americanas|\bb2w\b|casas\s*bahia|via\s*varejo|ponto\s*frio|pontofrio/.test(d))
+      return { ...t, category: 'Shopping' };
+    if (/mercado\s*(livre|pago)|mercadolivre|mercadopago|amazon|\bamzn\b|shopee|aliexpress|\bshein\b|submarino/.test(d))
+      return { ...t, category: 'Shopping' };
+    // Fashion & clothing
+    if (/\brenner\b|riachuelo|c\s*&\s*a\b|\bleader\b|marisa|\bzara\b|hering|arezzo|dafiti|netshoes|centauro/.test(d))
+      return { ...t, category: 'Shopping' };
+    // Electronics
+    if (/fast\s*shop|kabum|terabyte|samsung/.test(d))
+      return { ...t, category: 'Shopping' };
+    // Home & garden
+    if (/leroy\s*merlin|telhanorte|sodimac|cassol|\betna\b|tok\s*stok|mobly|westwing|madeira\s*madeira/.test(d))
+      return { ...t, category: 'Shopping' };
+    // Pet stores
+    if (/\bpetz\b|cobasi|petlove|pet\s*center/.test(d))
+      return { ...t, category: 'Shopping' };
+    // Beauty / cosmetics
+    if (/\bnatura\b|boticario|sephora|quem\s*disse|berenice|eudora|granado/.test(d))
+      return { ...t, category: 'Shopping' };
+
+    // ── FOOD & DINING (fast food & restaurants after delivery apps) ────────
+    if (/mcdonalds?|burger\s*king|\bbobs?\b|giraffas|habib|outback|spoleto|coco\s*bambu/.test(d))
+      return { ...t, category: 'Food & Dining' };
+    if (/subway|popeyes|\bkfc\b|jeronimo|frango\s*assado|china\s*in\s*box|pizza\s*hut|dominos?/.test(d))
+      return { ...t, category: 'Food & Dining' };
+    if (/madero|vivenda\s*do\s*camar|paris\s*6|starbucks|dunkin|nespresso|cafe\s*do\s*ponto/.test(d))
+      return { ...t, category: 'Food & Dining' };
+    if (/restaurante|pizzaria|churrascaria|lanchonete|padaria|confeitaria|sushi|boteco|cervejaria/.test(d))
+      return { ...t, category: 'Food & Dining' };
+
+    // ── EDUCATION ─────────────────────────────────────────────────────────
+    if (/estacio|anhanguera|kroton|cogna|\bunip\b|uninove|mackenzie|\bfgv\b|insper|\bpuc\b/.test(d))
+      return { ...t, category: 'Education' };
+    if (/\balura\b|rocketseat|coursera|udemy|hotmart|kiwify|eduzz|duolingo|babbel/.test(d))
+      return { ...t, category: 'Education' };
+    if (/colegio|\bescola\b|creche|material\s*escolar/.test(d))
+      return { ...t, category: 'Education' };
+
+    // ── ENTERTAINMENT ─────────────────────────────────────────────────────
+    if (/cinemark|cinepolis|kinoplex|\buci\s*(cinema)?\b|cinesystem|cinemais/.test(d))
+      return { ...t, category: 'Entertainment' };
+    if (/sympla|eventbrite|ingresso\s*(rapido|\.com)|ticket360|blueticket|bilheteria\s*digital/.test(d))
+      return { ...t, category: 'Entertainment' };
+
+    // ── PERSONAL CARE ─────────────────────────────────────────────────────
+    if (/smart\s*fit|bluefit|bodytech|academia|crossfit|pilates/.test(d))
+      return { ...t, category: 'Personal Care' };
+    if (/barbearia|salao\s*de\s*beleza|barba\s*e\s*cabelo/.test(d))
+      return { ...t, category: 'Personal Care' };
+
+    // ── HOUSING ───────────────────────────────────────────────────────────
+    if (/aluguel|condominio|\biptu\b|\bitbi\b|administradora\s*im(oveis|ovel)|taxa\s*cond/.test(d))
+      return { ...t, category: 'Housing' };
+    if (/quinto\s*andar|quintoandar|\bmrv\b|cyrela|helbor/.test(d))
       return { ...t, category: 'Housing' };
 
-    return t;
+    return t; // no match — leave AI classification as-is
   });
 }
 
