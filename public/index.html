@@ -202,6 +202,7 @@
     <p class="text-slate-500 mb-6" data-i18n="step1_sub">Select your country to set up the right currency.</p>
     <div class="multi-select-grid">
       <button class="multi-select-btn" onclick="selectCountry('Brazil', 'BRL', 'R$'); updateStep1()">🇧🇷 Brazil (R$)</button>
+      <button class="multi-select-btn" onclick="selectCountry('Netherlands', 'EUR', '€'); updateStep1()">🇳🇱 Netherlands (€)</button>
       <button class="multi-select-btn" onclick="selectCountry('Israel', 'ILS', '₪'); updateStep1()">🇮🇱 Israel (₪)</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
@@ -983,17 +984,22 @@ function budgetMonth(t) {
 // ─────────────────────────────────────
 function fmt(amount) {
   const symbol = state.onboarding?.currencySymbol || 'R$';
+  const country = state.onboarding?.country || 'Brazil';
   if (typeof amount !== 'number' || isNaN(amount)) return symbol + '0';
-  return symbol + Math.abs(amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const locale = country === 'Netherlands' ? 'nl-NL' : country === 'Israel' ? 'en-US' : 'pt-BR';
+  return symbol + Math.abs(amount).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ─────────────────────────────────────
 // MOCK DATA GENERATOR
 // ─────────────────────────────────────
 function generateMockData(country) {
-  const isBrazil = country === 'Brazil';
-  const salary = isBrazil ? (9500 + Math.random() * 1000) : (17000 + Math.random() * 2000);
-  const currency = isBrazil ? 'BRL' : 'ILS';
+  const isBrazil      = country === 'Brazil';
+  const isNetherlands = country === 'Netherlands';
+  const salary   = isBrazil ? (9500 + Math.random() * 1000)
+                 : isNetherlands ? (3200 + Math.random() * 800)
+                 : (17000 + Math.random() * 2000);
+  const currency = isBrazil ? 'BRL' : isNetherlands ? 'EUR' : 'ILS';
 
   // Merchant pools with category and typical amount range (generic names — no real brands)
   const merchantPool = isBrazil ? [
@@ -1017,6 +1023,22 @@ function generateMockData(country) {
     {name:'Padaria Local',cat:'Food & Dining',min:5,max:25},
     {name:'Banca de Revistas',cat:'Entertainment',min:5,max:15},
     {name:'Shopping Center',cat:'Entertainment',min:30,max:200}
+  ] : isNetherlands ? [
+    {name:'Neighbourhood Supermarket',cat:'Groceries',min:30,max:180},
+    {name:'Discount Supermarket',cat:'Groceries',min:20,max:120},
+    {name:'Fresh Produce Market',cat:'Groceries',min:10,max:60},
+    {name:'Bakery',cat:'Food & Dining',min:4,max:18},
+    {name:'Local Cafe',cat:'Food & Dining',min:5,max:25},
+    {name:'Restaurant',cat:'Food & Dining',min:20,max:80},
+    {name:'Food Delivery App',cat:'Food & Dining',min:15,max:55},
+    {name:'Train Travel',cat:'Transportation',min:10,max:80},
+    {name:'Public Transit',cat:'Transportation',min:2,max:40},
+    {name:'Fuel Station',cat:'Transportation',min:50,max:130},
+    {name:'Online Retailer',cat:'Shopping',min:15,max:300},
+    {name:'Electronics Store',cat:'Shopping',min:20,max:500},
+    {name:'Clothing Store',cat:'Shopping',min:20,max:150},
+    {name:'Pharmacy',cat:'Health & Medical',min:5,max:80},
+    {name:'Home Goods Store',cat:'Home & Garden',min:10,max:130}
   ] : [
     {name:'Supermarket A',cat:'Groceries',min:60,max:300},
     {name:'Discount Market',cat:'Groceries',min:50,max:250},
@@ -1047,6 +1069,13 @@ function generateMockData(country) {
     {name:'Plano Celular',cat:'Subscriptions & Software',amount:79.90},
     {name:'Concessionária Energia',cat:'Utilities',amount:220 + Math.random()*80},
     {name:'Companhia de Água',cat:'Utilities',amount:85 + Math.random()*40}
+  ] : isNetherlands ? [
+    {name:'Video Streaming',cat:'Subscriptions & Software',amount:17.99},
+    {name:'Music Streaming',cat:'Subscriptions & Software',amount:10.99},
+    {name:'Internet Provider',cat:'Utilities',amount:49.99},
+    {name:'Mobile Plan',cat:'Subscriptions & Software',amount:25},
+    {name:'Energy Provider',cat:'Utilities',amount:120 + Math.random()*40},
+    {name:'Water Company',cat:'Utilities',amount:28 + Math.random()*10}
   ] : [
     {name:'Video Streaming',cat:'Subscriptions & Software',amount:36.99},
     {name:'Cable & Internet',cat:'Subscriptions & Software',amount:110.84},
@@ -1062,6 +1091,11 @@ function generateMockData(country) {
     {name:'Aluguel',cat:'Housing',amount:2200},
     {name:'Condomínio',cat:'Housing',amount:450},
     {name:'Plano de Saúde',cat:'Insurance',amount:380}
+  ] : isNetherlands ? [
+    {name:'Rent',cat:'Housing',amount:1350},
+    {name:'Health Insurance',cat:'Insurance',amount:145},
+    {name:'Municipal Tax',cat:'Utilities',amount:52},
+    {name:'Home Insurance',cat:'Insurance',amount:18.50}
   ] : [
     {name:'Health Insurance',cat:'Insurance',amount:168},
     {name:'Life Insurance',cat:'Insurance',amount:39.60},
@@ -1086,8 +1120,8 @@ function generateMockData(country) {
       id: 'sal' + m + Math.random().toString(36).slice(2, 6),
       date: yearMo + '-' + String(salaryDay).padStart(2, '0'),
       billingDate: yearMo + '-' + String(salaryDay).padStart(2, '0'),
-      description: isBrazil ? 'Empregador' : 'Employer',
-      originalDescription: isBrazil ? 'PAGAMENTO SALÁRIO MENSAL' : 'MONTHLY SALARY PAYMENT',
+      description: isBrazil ? 'Empregador' : isNetherlands ? 'Employer' : 'Employer',
+      originalDescription: isBrazil ? 'PAGAMENTO SALÁRIO MENSAL' : isNetherlands ? 'SALARIS BETALING' : 'MONTHLY SALARY PAYMENT',
       amount: salaryAmt,
       currency, type: 'credit', category: 'Income', source: 'bank',
       _isIncome: true, _isTransfer: false
@@ -1143,8 +1177,8 @@ function generateMockData(country) {
         id: 'tr' + m + Math.random().toString(36).slice(2, 5),
         date: yearMo + '-' + String(10 + Math.floor(Math.random() * 15)).padStart(2, '0'),
         billingDate: yearMo + '-' + String(10 + Math.floor(Math.random() * 15)).padStart(2, '0'),
-        description: isBrazil ? 'PIX Enviado' : 'Bit Transfer',
-        originalDescription: isBrazil ? 'PIX ENVIADO' : 'BIT',
+        description: isBrazil ? 'PIX Enviado' : isNetherlands ? 'iDEAL Transfer' : 'Bit Transfer',
+        originalDescription: isBrazil ? 'PIX ENVIADO' : isNetherlands ? 'IDEAL OVERBOEKING' : 'BIT',
         amount: Math.round((200 + Math.random() * 800) * 100) / 100,
         currency, type: 'debit', category: 'Transfers', source: 'bank',
         _isIncome: false, _isTransfer: true
