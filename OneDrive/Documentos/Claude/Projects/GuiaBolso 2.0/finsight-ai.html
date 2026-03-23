@@ -617,6 +617,28 @@
 
 <script>
 // ─────────────────────────────────────
+// CHART.JS CENTER-TEXT PLUGIN
+// ─────────────────────────────────────
+const doughnutCenterPlugin = {
+  id: 'doughnutCenter',
+  afterDraw(chart) {
+    if (chart.config.type !== 'doughnut') return;
+    const txt = chart.config.options.plugins?.doughnutCenter?.text;
+    if (!txt) return;
+    const { ctx, chartArea: { top, left, width, height } } = chart;
+    const cx = left + width / 2, cy = top + height / 2;
+    ctx.save();
+    ctx.font = 'bold 13px system-ui,-apple-system,sans-serif';
+    ctx.fillStyle = '#1e293b';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(txt, cx, cy);
+    ctx.restore();
+  }
+};
+Chart.register(doughnutCenterPlugin);
+
+// ─────────────────────────────────────
 // BACKEND CONFIG
 // ─────────────────────────────────────
 const BACKEND_URL = 'https://mybudget-api.vercel.app';
@@ -951,78 +973,78 @@ function generateMockData(country) {
   const salary = isBrazil ? (9500 + Math.random() * 1000) : (17000 + Math.random() * 2000);
   const currency = isBrazil ? 'BRL' : 'ILS';
 
-  // Merchant pools with category and typical amount range
+  // Merchant pools with category and typical amount range (generic names — no real brands)
   const merchantPool = isBrazil ? [
-    {name:'Supermercado Extra',cat:'Groceries',min:80,max:350},
-    {name:'Pão de Açúcar',cat:'Groceries',min:60,max:280},
-    {name:'Hortifruti',cat:'Groceries',min:30,max:120},
-    {name:'iFood',cat:'Food & Dining',min:25,max:90},
-    {name:'Habib\'s',cat:'Food & Dining',min:20,max:65},
-    {name:'Starbucks',cat:'Food & Dining',min:15,max:40},
-    {name:'Giraffas',cat:'Food & Dining',min:30,max:70},
-    {name:'Uber',cat:'Transportation',min:12,max:55},
-    {name:'99 Taxi',cat:'Transportation',min:10,max:50},
-    {name:'Posto Shell',cat:'Transportation',min:150,max:350},
-    {name:'Farmácia Drogasil',cat:'Health & Medical',min:25,max:180},
-    {name:'Drogaria São Paulo',cat:'Health & Medical',min:20,max:120},
-    {name:'Amazon',cat:'Shopping',min:30,max:400},
-    {name:'Mercado Livre',cat:'Shopping',min:20,max:300},
-    {name:'Renner',cat:'Shopping',min:50,max:250},
-    {name:'Boticário',cat:'Personal Care',min:40,max:150},
-    {name:'Magazine Luiza',cat:'Shopping',min:80,max:600},
-    {name:'Padaria São Jorge',cat:'Food & Dining',min:5,max:25},
-    {name:'Banca de Jornal',cat:'Entertainment',min:5,max:15},
-    {name:'Shopping Iguatemi',cat:'Entertainment',min:30,max:200}
+    {name:'Supermercado Bairro',cat:'Groceries',min:80,max:350},
+    {name:'Mercado Central',cat:'Groceries',min:60,max:280},
+    {name:'Hortifruti Local',cat:'Groceries',min:30,max:120},
+    {name:'App Delivery',cat:'Food & Dining',min:25,max:90},
+    {name:'Lanchonete Popular',cat:'Food & Dining',min:20,max:65},
+    {name:'Cafeteria',cat:'Food & Dining',min:15,max:40},
+    {name:'Restaurante Família',cat:'Food & Dining',min:30,max:70},
+    {name:'App Mobilidade',cat:'Transportation',min:12,max:55},
+    {name:'Táxi Local',cat:'Transportation',min:10,max:50},
+    {name:'Posto Combustível',cat:'Transportation',min:150,max:350},
+    {name:'Farmácia do Bairro',cat:'Health & Medical',min:25,max:180},
+    {name:'Drogaria Central',cat:'Health & Medical',min:20,max:120},
+    {name:'Loja Online',cat:'Shopping',min:30,max:400},
+    {name:'Marketplace',cat:'Shopping',min:20,max:300},
+    {name:'Loja de Roupas',cat:'Shopping',min:50,max:250},
+    {name:'Perfumaria',cat:'Personal Care',min:40,max:150},
+    {name:'Loja de Eletrônicos',cat:'Shopping',min:80,max:600},
+    {name:'Padaria Local',cat:'Food & Dining',min:5,max:25},
+    {name:'Banca de Revistas',cat:'Entertainment',min:5,max:15},
+    {name:'Shopping Center',cat:'Entertainment',min:30,max:200}
   ] : [
-    {name:'Shufersal',cat:'Groceries',min:60,max:300},
-    {name:'Rami Levy',cat:'Groceries',min:50,max:250},
-    {name:'Allenby Market',cat:'Groceries',min:15,max:120},
-    {name:'Fruit & Veg Market',cat:'Groceries',min:30,max:100},
-    {name:'Aroma',cat:'Food & Dining',min:20,max:80},
-    {name:'Michel Falafel',cat:'Food & Dining',min:30,max:72},
-    {name:'Cafe Noir',cat:'Food & Dining',min:25,max:60},
-    {name:'Hermitage Restaurant',cat:'Food & Dining',min:150,max:560},
-    {name:'Dor Fuel Station',cat:'Transportation',min:150,max:350},
-    {name:'Rav-Kav Transit',cat:'Transportation',min:42,max:50},
-    {name:'Super-Pharm',cat:'Health & Medical',min:30,max:300},
-    {name:'Amazon Purchase',cat:'Shopping',min:50,max:500},
-    {name:'IKEA',cat:'Home & Garden',min:50,max:300},
-    {name:'Max Stock Home',cat:'Home & Garden',min:10,max:130},
-    {name:'Maccabi Health Fund',cat:'Health & Medical',min:280,max:320},
-    {name:'Al-Habaz Bakery',cat:'Food & Dining',min:5,max:50},
-    {name:'Wolt Delivery',cat:'Food & Dining',min:40,max:200},
-    {name:'Pango Parking',cat:'Transportation',min:20,max:95}
+    {name:'Supermarket A',cat:'Groceries',min:60,max:300},
+    {name:'Discount Market',cat:'Groceries',min:50,max:250},
+    {name:'Neighborhood Market',cat:'Groceries',min:15,max:120},
+    {name:'Produce Stand',cat:'Groceries',min:30,max:100},
+    {name:'Coffee Shop',cat:'Food & Dining',min:20,max:80},
+    {name:'Falafel Stand',cat:'Food & Dining',min:30,max:72},
+    {name:'Cafe Bar',cat:'Food & Dining',min:25,max:60},
+    {name:'Local Restaurant',cat:'Food & Dining',min:150,max:560},
+    {name:'Fuel Station',cat:'Transportation',min:150,max:350},
+    {name:'Public Transit',cat:'Transportation',min:42,max:50},
+    {name:'Pharmacy Chain',cat:'Health & Medical',min:30,max:300},
+    {name:'Online Store',cat:'Shopping',min:50,max:500},
+    {name:'Furniture Store',cat:'Home & Garden',min:50,max:300},
+    {name:'Home Goods Store',cat:'Home & Garden',min:10,max:130},
+    {name:'Health Fund',cat:'Health & Medical',min:280,max:320},
+    {name:'Bakery',cat:'Food & Dining',min:5,max:50},
+    {name:'Food Delivery App',cat:'Food & Dining',min:40,max:200},
+    {name:'Parking App',cat:'Transportation',min:20,max:95}
   ];
 
-  // Recurring subscriptions (appear every month, consistent amount)
+  // Recurring subscriptions (appear every month, consistent amount — generic names)
   const subs = isBrazil ? [
-    {name:'Netflix',cat:'Subscriptions & Software',amount:39.90},
-    {name:'Spotify',cat:'Subscriptions & Software',amount:21.90},
-    {name:'Amazon Prime',cat:'Subscriptions & Software',amount:14.90},
-    {name:'Claro Internet',cat:'Utilities',amount:119.90},
-    {name:'Vivo Celular',cat:'Subscriptions & Software',amount:79.90},
-    {name:'Energisa',cat:'Utilities',amount:220 + Math.random()*80},
-    {name:'SABESP',cat:'Utilities',amount:85 + Math.random()*40}
+    {name:'Streaming Vídeo',cat:'Subscriptions & Software',amount:39.90},
+    {name:'Streaming Música',cat:'Subscriptions & Software',amount:21.90},
+    {name:'Clube de Compras',cat:'Subscriptions & Software',amount:14.90},
+    {name:'Provedor Internet',cat:'Utilities',amount:119.90},
+    {name:'Plano Celular',cat:'Subscriptions & Software',amount:79.90},
+    {name:'Concessionária Energia',cat:'Utilities',amount:220 + Math.random()*80},
+    {name:'Companhia de Água',cat:'Utilities',amount:85 + Math.random()*40}
   ] : [
-    {name:'Netflix',cat:'Subscriptions & Software',amount:36.99},
-    {name:'HOT Cable/Internet',cat:'Subscriptions & Software',amount:110.84},
-    {name:'HOT Next TV',cat:'Subscriptions & Software',amount:59.39},
-    {name:'Golan Telecom',cat:'Subscriptions & Software',amount:99},
-    {name:'YouTube Premium',cat:'Subscriptions & Software',amount:349},
-    {name:'Apple Subscriptions',cat:'Subscriptions & Software',amount:74.90},
-    {name:'HOT Energy',cat:'Utilities',amount:430 + Math.random()*200}
+    {name:'Video Streaming',cat:'Subscriptions & Software',amount:36.99},
+    {name:'Cable & Internet',cat:'Subscriptions & Software',amount:110.84},
+    {name:'TV Package',cat:'Subscriptions & Software',amount:59.39},
+    {name:'Mobile Plan',cat:'Subscriptions & Software',amount:99},
+    {name:'Video Platform',cat:'Subscriptions & Software',amount:349},
+    {name:'App Subscriptions',cat:'Subscriptions & Software',amount:74.90},
+    {name:'Electric Company',cat:'Utilities',amount:430 + Math.random()*200}
   ];
 
-  // Fixed monthly costs
+  // Fixed monthly costs (generic names)
   const fixed = isBrazil ? [
     {name:'Aluguel',cat:'Housing',amount:2200},
     {name:'Condomínio',cat:'Housing',amount:450},
-    {name:'Plano de Saúde Unimed',cat:'Insurance',amount:380}
+    {name:'Plano de Saúde',cat:'Insurance',amount:380}
   ] : [
-    {name:'Menora Health Insurance',cat:'Insurance',amount:168},
-    {name:'Menora Life Insurance',cat:'Insurance',amount:39.60},
-    {name:'Card Annual Fee',cat:'Banking Fees',amount:38.90},
-    {name:'Ituran GPS',cat:'Insurance',amount:70.26}
+    {name:'Health Insurance',cat:'Insurance',amount:168},
+    {name:'Life Insurance',cat:'Insurance',amount:39.60},
+    {name:'Bank Annual Fee',cat:'Banking Fees',amount:38.90},
+    {name:'Vehicle Tracking',cat:'Insurance',amount:70.26}
   ];
 
   let txns = [];
@@ -1042,8 +1064,8 @@ function generateMockData(country) {
       id: 'sal' + m + Math.random().toString(36).slice(2, 6),
       date: yearMo + '-' + String(salaryDay).padStart(2, '0'),
       billingDate: yearMo + '-' + String(salaryDay).padStart(2, '0'),
-      description: isBrazil ? 'Empresa XYZ Ltda' : 'Papaya Global',
-      originalDescription: isBrazil ? 'TED EMPRESA XYZ LTDA' : 'פאפאיה גלובל',
+      description: isBrazil ? 'Empregador' : 'Employer',
+      originalDescription: isBrazil ? 'PAGAMENTO SALÁRIO MENSAL' : 'MONTHLY SALARY PAYMENT',
       amount: salaryAmt,
       currency, type: 'credit', category: 'Income', source: 'bank',
       _isIncome: true, _isTransfer: false
@@ -1797,6 +1819,7 @@ function renderCategoryChart(catSums) {
   ctx.canvas.style.display = '';
   ctx.canvas.closest('.card')?.querySelector('.cat-empty')?.remove();
 
+  const total = sorted.reduce((s, x) => s + x[1], 0);
   state.charts.category = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -1811,9 +1834,12 @@ function renderCategoryChart(catSums) {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: {
-        label: ctx => fmt(ctx.parsed)
-      }}}
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: c => fmt(c.parsed) }},
+        doughnutCenter: { text: fmt(total) }
+      }
     }
   });
 }
