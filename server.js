@@ -58,9 +58,24 @@ function hebrewPostProcess(transactions) {
     if (/הו.ק.*הלוו?א|הלוואה קרן|הלוואה ריבית|הלו.*ריבית|הלו.*קרן/.test(d))
       return { ...t, category: 'Loans & Debt' };
 
-    // Bank transfers & cheques → Transfers (or Refunds if positive)
-    if (/שיק בנקאי|רכישת שיק|ביטול שיק|העב.? לאחר|העברה/.test(d))
+    // Bank cheques and confirmed mobile/inter-account transfers
+    // NOTE: generic "העברה" intentionally excluded here — employer salary deposits
+    // also appear as "העברה - [Company Name]" and must stay as Income
+    if (/שיק בנקאי|רכישת שיק|ביטול שיק|העב.? לאחר/.test(d))
       return { ...t, category: isCredit ? 'Refunds & Credits' : 'Transfers' };
+
+    // Salary / payroll credits → Income (any positive credit with payroll-related keywords)
+    if (isCredit && /משכורת|שכר עבודה|שכר|פיצוי|בונוס|תגמול|מקדמה.*שכר|שכר.*מקדמה/.test(d))
+      return { ...t, category: 'Income' };
+
+    // Papaya Global (payroll platform) — positive=salary in, negative=payroll out
+    if (/פאפאיה/.test(d))
+      return { ...t, category: isCredit ? 'Income' : 'Transfers' };
+
+    // Generic outgoing "העברה" (no salary keywords) → Transfers
+    // Incoming "העברה" (positive) is left to AI classification — could be salary from employer
+    if (/העברה/.test(d) && !isCredit)
+      return { ...t, category: 'Transfers' };
 
     // ATM / cash withdrawals → Cash & ATM
     if (/משיכה|בנקט|כספומט/.test(d))
@@ -89,10 +104,6 @@ function hebrewPostProcess(transactions) {
     // Government allowances → Income
     if (/קצבת ילדים|ביטוח לאומי|גמלה/.test(d))
       return { ...t, category: 'Income' };
-
-    // Papaya Global (payroll platform) — positive=salary in, negative=payroll out
-    if (/פאפאיה/.test(d))
-      return { ...t, category: isCredit ? 'Income' : 'Transfers' };
 
     return t;
   });
@@ -149,9 +160,11 @@ app.post('/api/parse-file', async (req, res) => {
   * Negative amounts (debits) are expenses; positive amounts (credits) are income
   * Common Hebrew terms and their categories:
     - קצבת ילדים, ביטוח לאומי, גמלה, משכורת, פאפאיה גלובל = Income (salary/government payments)
+    - Any positive credit from an employer or company name (tech companies, corporations, startups) = Income (salary/payroll) — even if the description also contains "העברה"
     - כרטיסי אשראי, ישראכרט, אלבר קרדיט, דיינרס קלוב, ויזה כאל, מקס, כאל, מקס אי טי = Transfers (credit card payments)
     - הו"ק הלוואה, הו"ק הלו', הלוואה קרן, הלוואה ריבית = Loans & Debt (loan payments)
-    - העב', העברה, העב' לאחר נייד, רכישת שיק בנקאי, ביטול שיק בנקאי, שיק בנקאי = Transfers (bank transfers)
+    - העב' לאחר נייד, רכישת שיק בנקאי, ביטול שיק בנקאי, שיק בנקאי = Transfers (inter-account bank transfers)
+    - "העברה" alone (without employer context) = Transfers; "העברה" FROM a company/employer = Income
     - משיכה, משיכה מבנקט, כספומט = Cash & ATM (ATM withdrawals)
     - דירקט, דירקט מצטבר, עמלה, עמלת שיק בנקאי, עמלת חשבון = Banking Fees
     - ארנונה = Utilities (municipal tax)
