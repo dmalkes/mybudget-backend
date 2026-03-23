@@ -446,7 +446,7 @@
         <h3 class="font-semibold text-slate-800" data-i18n="cat_title">Top categories</h3>
         <select id="catChartMonthFilter" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer" onchange="updateCatChart()"></select>
       </div>
-      <canvas id="dashCategoryChart" width="100" height="40"></canvas>
+      <canvas id="dashCategoryChart" style="max-height:220px"></canvas>
     </div>
 
     <!-- Subscriptions -->
@@ -627,8 +627,11 @@ const doughnutCenterPlugin = {
     if (!txt) return;
     const { ctx, chartArea: { top, left, width, height } } = chart;
     const cx = left + width / 2, cy = top + height / 2;
+    // Scale font to the inner hole: cutout=65% of the shorter dimension
+    const innerR = Math.min(width, height) / 2 * 0.65;
+    const fontSize = Math.round(Math.max(11, innerR * 0.38));
     ctx.save();
-    ctx.font = 'bold 13px system-ui,-apple-system,sans-serif';
+    ctx.font = `bold ${fontSize}px system-ui,-apple-system,sans-serif`;
     ctx.fillStyle = '#1e293b';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1834,6 +1837,7 @@ function renderCategoryChart(catSums) {
     options: {
       responsive: true,
       maintainAspectRatio: true,
+      aspectRatio: 1.6,
       cutout: '65%',
       plugins: {
         legend: { position: 'bottom' },
