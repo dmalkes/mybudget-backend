@@ -629,7 +629,7 @@ const doughnutCenterPlugin = {
     const cx = left + width / 2, cy = top + height / 2;
     // Scale font to the inner hole: cutout=65% of the shorter dimension
     const innerR = Math.min(width, height) / 2 * 0.65;
-    const fontSize = Math.round(Math.max(11, innerR * 0.38));
+    const fontSize = Math.round(Math.max(10, innerR * 0.28));
     ctx.save();
     ctx.font = `bold ${fontSize}px system-ui,-apple-system,sans-serif`;
     ctx.fillStyle = '#1e293b';
@@ -1144,7 +1144,15 @@ function loadStorage() {
     const ob = localStorage.getItem(LS.ONBOARDING);
     if (ob) state.onboarding = JSON.parse(ob);
     const txns = localStorage.getItem(LS.TRANSACTIONS);
-    if (txns) state.transactions = JSON.parse(txns);
+    if (txns) {
+      state.transactions = JSON.parse(txns);
+      // Always re-derive flags from category so stored data stays correct
+      // even after classification-logic changes (e.g. JFrog → Income fix)
+      state.transactions.forEach(t => {
+        t._isIncome   = t.category === 'Income';
+        t._isTransfer = t.category === 'Transfers';
+      });
+    }
     const m = localStorage.getItem(LS.MAPPINGS);
     if (m) state.customMappings = JSON.parse(m);
     const s = localStorage.getItem(LS.SALARY);
