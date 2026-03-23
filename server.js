@@ -29,8 +29,14 @@ const chatLimiter = rateLimit({
   message: { error: 'Too many requests — please try again later.' },
 });
 
-// Serve the frontend app
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve the frontend app — no-store on HTML to prevent CDN edge caching stale JS
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store');
+    }
+  }
+}));
 
 // Get API key from environment variable
 const API_KEY = process.env.ANTHROPIC_API_KEY;
