@@ -110,10 +110,6 @@ function brazilPostProcess(transactions) {
     if (isCredit && /\binss\b|previdencia|previdência|bolsa familia|bolsa família|auxilio|auxílio|beneficio|benefício|fgts|rescisao|rescisão/.test(d))
       return { ...t, category: 'Income' };
 
-    // PIX / TED / DOC transfers (ambiguous — leave income credits to AI, only fix outgoing)
-    if (!isCredit && /\bpix\b|\bted\b|\bdoc\b/.test(d))
-      return { ...t, category: 'Transfers' };
-
     // ATM withdrawals → Cash & ATM
     if (/saque|saq |caixa eletronico|caixa eletrônico|\batm\b/.test(d))
       return { ...t, category: 'Cash & ATM' };
@@ -126,11 +122,11 @@ function brazilPostProcess(transactions) {
     if (/parcela\s*(emprestimo|empréstimo|financiamento|credito|crédito)|emprestimo|empréstimo|financiamento|consignado/.test(d))
       return { ...t, category: 'Loans & Debt' };
 
-    // Food delivery & restaurants → Food & Dining
+    // Food delivery & restaurants → Food & Dining (check BEFORE PIX fallback — paid via PIX too)
     if (/ifood|i\.food|rappi|uber\s*eats|ubereats|james\s*delivery|aiqfome|goomer|domino|pizza|lanchonete|restaurante|padaria|bakery|mcdonalds|mcdonald|burger\s*king|subway|outback|giraffas|habib/.test(d))
       return { ...t, category: 'Food & Dining' };
 
-    // Ride hailing → Transportation
+    // Ride hailing → Transportation (check BEFORE PIX fallback)
     if (/\buber\b(?!\s*eats)|\b99\b|99app|cabify|indriver|buser|transfer\s*(aeroporto|airport)/.test(d))
       return { ...t, category: 'Transportation' };
 
@@ -138,9 +134,13 @@ function brazilPostProcess(transactions) {
     if (/ipiranga|shell|br\s*distribuidora|petrobras|ale\s*combustivel|raizen|graal|posto\b/.test(d))
       return { ...t, category: 'Transportation' };
 
-    // Public transit → Transportation
-    if (/bilhete\s*unico|bilhete único|metro\b|metrô|cptm|sptrans|rodoviaria|rodoviária|passagem|onibus|ônibus|transporte/.test(d))
+    // Public transit & bus companies → Transportation (check BEFORE PIX fallback)
+    if (/bilhete\s*unico|bilhete único|metro\b|metrô|cptm|sptrans|rodoviaria|rodoviária|passagem|onibus|ônibus|transporte|empresa.*trans|viacao|viação|van\s*escolar/.test(d))
       return { ...t, category: 'Transportation' };
+
+    // PIX / TED / DOC with no identifiable payee → Transfers (fallback, after merchant checks)
+    if (!isCredit && /\bpix\b|\bted\b|\bdoc\b/.test(d))
+      return { ...t, category: 'Transfers' };
 
     // Supermarkets / groceries → Groceries
     if (/carrefour|extra\b|assai|assaí|atacadao|atacadão|prezunic|guanabara|hortifruti|pao\s*de\s*acucar|pão\s*de\s*açúcar|supermercado|mercado(?!livre|pago)|atacarejo|mundial\b|cencosud/.test(d))

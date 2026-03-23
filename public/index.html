@@ -1827,6 +1827,7 @@ function renderDashboard() {
     catMonthSel.innerHTML = spendMonths.slice().reverse().map(m =>
       `<option value="${m}" ${m === thisMonth ? 'selected' : ''}>${new Date(m + '-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
     ).join('');
+    catMonthSel.value = thisMonth; // force correct selection on iOS Safari (selected attr in dynamic innerHTML is unreliable)
   }
 
   renderCategoryChart(catSums);
