@@ -357,9 +357,13 @@
 <!-- PROCESSING OVERLAY (outside mainApp so it works during upload too) -->
 <div id="processingOverlay" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center px-8" style="background:rgba(248,250,252,.97);z-index:200">
   <div class="grad w-20 h-20 rounded-full flex items-center justify-center mb-6" style="box-shadow:0 8px 32px rgba(99,102,241,.4)">
-    <svg class="spin w-9 h-9 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3.5"/><path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z"/></svg>
+    <svg width="36" height="36" fill="none" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </div>
-  <p id="procMessage" class="text-lg font-semibold text-slate-700" style="min-height:1.8em;transition:opacity .3s"></p>
+  <p id="procMessage" class="text-lg font-semibold text-slate-700 mb-6" style="min-height:1.8em;transition:opacity .3s"></p>
+  <div style="width:260px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+    <div id="procProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:4px;transition:width .4s ease"></div>
+  </div>
+  <p id="procProgressPct" class="text-sm font-semibold text-indigo-600 mt-2">0%</p>
 </div>
 
 <!-- ══════════════ MAIN APP ══════════════ -->
@@ -376,7 +380,7 @@
       </div>
       <div class="flex items-center gap-2">
         <button onclick="showUploadSheet()" class="text-xs font-medium text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all">+ Upload</button>
-        <button onclick="resetApp()" class="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-all">⚙</button>
+        <button onclick="toggleSettingsMenu()" class="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-all">⚙️</button>
       </div>
     </div>
   </header>
@@ -420,7 +424,10 @@
           <span id="heroNet" class="text-white/80 text-sm"></span>
           <span id="heroCount" class="text-white/60 text-xs"></span>
         </div>
-        <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
+        <div class="flex items-center gap-2">
+          <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
+          <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
+        </div>
       </div>
     </div>
 
@@ -428,7 +435,7 @@
     <div class="card-sm p-4 mb-4 fade-up" id="overviewFvCard">
       <div class="flex justify-between items-center mb-2">
         <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide" data-i18n="fv_title">Fixed vs Variable</span>
-        <button onclick="switchTab('budget')" class="text-xs text-indigo-500 font-medium" data-i18n="fv_details">Details →</button>
+        <button onclick="switchTab('transactions')" class="text-xs text-indigo-500 font-medium" data-i18n="fv_details">Details →</button>
       </div>
       <div id="overviewFvBar"></div>
     </div>
@@ -437,7 +444,7 @@
     <div class="card p-4 mb-4 fade-up">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-semibold text-slate-800" data-i18n="cat_title">Top categories</h3>
-        <button onclick="switchTab('budget')" class="text-xs text-indigo-500 font-medium" data-i18n="view_all">View all →</button>
+        <select id="catChartMonthFilter" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer" onchange="updateCatChart()"></select>
       </div>
       <canvas id="dashCategoryChart" width="100" height="40"></canvas>
     </div>
@@ -493,6 +500,12 @@
       </div>
     </div>
 
+    <!-- Fixed vs Variable split -->
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-slate-800 mb-4">Fixed vs Variable</h3>
+      <div id="fvContent"></div>
+    </div>
+
     <!-- Budget by category -->
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-4">
@@ -500,12 +513,6 @@
         <button onclick="addCategoryBudget()" class="text-xs text-indigo-500 hover:underline">+ Set budget</button>
       </div>
       <div id="budgetList" class="space-y-3"></div>
-    </div>
-
-    <!-- Fixed vs Variable split -->
-    <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-slate-800 mb-4">Fixed vs Variable</h3>
-      <div id="fvContent"></div>
     </div>
 
     <!-- Subscriptions -->
@@ -564,26 +571,18 @@
       <div class="nav-icon">📊</div>
       <span data-i18n="nav_overview">Overview</span>
     </div>
-    <div class="nav-btn" onclick="switchTab('budget')">
-      <div class="nav-icon">💼</div>
-      <span data-i18n="nav_budget">Budget</span>
-    </div>
     <div class="nav-btn" onclick="switchTab('transactions')">
       <div class="nav-icon">📜</div>
       <span data-i18n="nav_transactions">Transactions</span>
     </div>
     <div class="nav-btn" onclick="switchTab('insights')">
       <div class="nav-icon">💡</div>
-      <span>Insights</span>
-    </div>
-    <div class="nav-btn" onclick="toggleSettingsMenu()">
-      <div class="nav-icon">⚙️</div>
-      <span data-i18n="nav_settings">Settings</span>
+      <span data-i18n="insights_title">Insights</span>
     </div>
   </div>
 
   <!-- SETTINGS MENU -->
-  <div id="settingsMenu" style="position:fixed;bottom:72px;right:16px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:8px;z-index:40;display:none;min-width:140px">
+  <div id="settingsMenu" style="position:fixed;top:52px;right:16px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:8px;z-index:40;display:none;min-width:140px">
     <button onclick="resetApp()" style="width:100%;padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:.9rem;color:#dc2626;hover:background:#fee2e2;border-radius:8px;transition:background .15s">
       🔄 Reset & Start Over
     </button>
@@ -676,7 +675,7 @@ const STRINGS = {
     upload_drop:'Drop files here or tap to browse',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
     upload_browse:'Browse files',upload_sample:'Try with sample data',upload_analyze:'Analyze Files',
     upload_privacy:'🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.',
-    proc_messages:['Importing transactions…','Reading your statement…','Categorizing expenses…','Optimizing your budget…','Almost there…'],
+    proc_messages:['Importing transactions…','Reading your statement…','Categorizing expenses…','Optimizing your budget…','Almost there…',"Since it's the first use, it may take some time"],
     nav_overview:'Overview',nav_budget:'Budget',nav_transactions:'Transactions',nav_settings:'Settings',
     months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     chart_spending: 'Spending', chart_income: 'Income',
@@ -736,7 +735,7 @@ const STRINGS = {
     upload_drop:'Solte os arquivos aqui ou toque para procurar',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
     upload_browse:'Procurar arquivos',upload_sample:'Testar com dados de exemplo',upload_analyze:'Analisar arquivos',
     upload_privacy:'🔒 Seus dados ficam privados. Todo o processamento é feito com segurança e seus dados financeiros nunca são armazenados em nossos servidores.',
-    proc_messages:['Importando transações…','Lendo seu extrato…','Categorizando despesas…','Otimizando seu orçamento…','Quase lá…'],
+    proc_messages:['Importando transações…','Lendo seu extrato…','Categorizando despesas…','Otimizando seu orçamento…','Quase lá…','Como é a primeira vez, pode demorar um pouco'],
     nav_overview:'Visão Geral',nav_budget:'Orçamento',nav_transactions:'Transações',nav_settings:'Ajustes',
     months: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
     chart_spending: 'Gastos', chart_income: 'Renda',
@@ -796,7 +795,7 @@ const STRINGS = {
     upload_drop:'שחרר קבצים כאן או הקש לעיון',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
     upload_browse:'עיון בקבצים',upload_sample:'נסה עם נתוני דוגמה',upload_analyze:'ניתוח קבצים',
     upload_privacy:'🔒 הנתונים שלך נשארים פרטיים. כל העיבוד מתבצע בצורה מאובטחת ולעולם אינו מאוחסן בשרתים שלנו.',
-    proc_messages:['מייבא עסקאות…','קורא את דף החשבון…','מסווג הוצאות…','מייעל את התקציב שלך…','כמעט מוכן…'],
+    proc_messages:['מייבא עסקאות…','קורא את דף החשבון…','מסווג הוצאות…','מייעל את התקציב שלך…','כמעט מוכן…','בהיות שמדובר בשימוש ראשון, זה עשוי לקחת קצת יותר זמן'],
     nav_overview:'סקירה',nav_budget:'תקציב',nav_transactions:'עסקאות',nav_settings:'הגדרות',
     months: ['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצ'],
     chart_spending: 'הוצאות', chart_income: 'הכנסות',
@@ -1620,16 +1619,31 @@ function hideUploadSheet() {
 }
 
 let _procInterval = null;
+let _procProgressInterval = null;
 
 function showProcessing() {
   const overlay = document.getElementById('processingOverlay');
   overlay.classList.remove('hidden');
   const msgs = t('proc_messages');
   const msgEl = document.getElementById('procMessage');
-  let i = 0;
+  const bar = document.getElementById('procProgressBar');
+  const pctEl = document.getElementById('procProgressPct');
+  let i = 0, pct = 0;
   msgEl.style.opacity = '1';
   msgEl.textContent = msgs[i];
+
+  // Fake progress: fast to 30%, slow to 85%, hold
+  function advanceProgress() {
+    if (pct < 30) pct += 3;
+    else if (pct < 60) pct += 1.5;
+    else if (pct < 85) pct += 0.5;
+    // Hold at 85% until done
+    if (bar) bar.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+  }
+
   _procInterval = setInterval(() => {
+    advanceProgress();
     msgEl.style.opacity = '0';
     setTimeout(() => {
       i = (i + 1) % msgs.length;
@@ -1637,11 +1651,23 @@ function showProcessing() {
       msgEl.style.opacity = '1';
     }, 300);
   }, 2500);
+
+  // Store progress timer ref
+  _procProgressInterval = setInterval(advanceProgress, 150);
 }
 
 function hideProcessing() {
-  document.getElementById('processingOverlay').classList.add('hidden');
+  const bar = document.getElementById('procProgressBar');
+  const pctEl = document.getElementById('procProgressPct');
+  if (bar) bar.style.width = '100%';
+  if (pctEl) pctEl.textContent = '100%';
   if (_procInterval) { clearInterval(_procInterval); _procInterval = null; }
+  if (_procProgressInterval) { clearInterval(_procProgressInterval); _procProgressInterval = null; }
+  setTimeout(() => {
+    document.getElementById('processingOverlay').classList.add('hidden');
+    if (bar) bar.style.width = '0%';
+    if (pctEl) pctEl.textContent = '0%';
+  }, 400);
 }
 
 // ─────────────────────────────────────
@@ -1703,6 +1729,16 @@ function renderDashboard() {
   thisMonthTxns.filter(t => t.category !== 'Refunds & Credits').forEach(t => {
     catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
+
+  // Populate the month filter dropdown for the category chart
+  const catMonthSel = document.getElementById('catChartMonthFilter');
+  if (catMonthSel) {
+    const locale = state.language === 'Hebrew' ? 'he' : state.language === 'Portuguese' ? 'pt-BR' : 'en';
+    catMonthSel.innerHTML = spendMonths.slice().reverse().map(m =>
+      `<option value="${m}" ${m === thisMonth ? 'selected' : ''}>${new Date(m + '-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
+    ).join('');
+  }
+
   renderCategoryChart(catSums);
 
   // Monthly chart
@@ -1780,6 +1816,18 @@ function renderCategoryChart(catSums) {
       }}}
     }
   });
+}
+
+function updateCatChart() {
+  const sel = document.getElementById('catChartMonthFilter');
+  const selectedMonth = sel ? sel.value : '';
+  const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
+  const monthTxns = selectedMonth ? spending.filter(t => budgetMonth(t) === selectedMonth) : spending;
+  const catSums = {};
+  monthTxns.filter(t => t.category !== 'Refunds & Credits').forEach(t => {
+    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
+  });
+  renderCategoryChart(catSums);
 }
 
 function renderMonthlyChart(spending) {
@@ -1909,16 +1957,20 @@ function renderBudgetPage() {
     const pct = budget > 0 ? (spent / budget) * 100 : 0;
     const warn = pct > 100;
 
-    const barColor = warn ? '#ef4444' : pct > 75 ? '#f59e0b' : '#6366f1';
     return `<div class="budget-row">
-      <div>
-        <p class="text-sm font-semibold text-slate-800">${cat}</p>
-        <p class="text-xs text-slate-500">${fmt(spent)}${budget > 0 ? ' / ' + fmt(budget) : ' · ' + t('budget_no_set')}</p>
+      <div class="flex-1">
+        <div class="flex justify-between items-center">
+          <p class="text-sm font-semibold text-slate-800">${tCat(cat)}</p>
+          <p class="text-xs ${warn ? 'text-red-500 font-semibold' : 'text-slate-500'}">${fmt(spent)}${budget > 0 ? ' / ' + fmt(budget) : ' · ' + t('budget_no_set')}</p>
+        </div>
+        ${budget > 0 ? `
+        <div style="height:8px;background:#e5e7eb;border-radius:4px;margin-top:6px;overflow:hidden;position:relative">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${Math.min(pct,100)}%;background:${pct>100?'#ef4444':pct>75?'#f59e0b':'#22c55e'};border-radius:4px;transition:width .4s"></div>
+          ${warn ? `<div style="position:absolute;left:100%;transform:translateX(-${100-(pct-100)/pct*100}%);top:0;height:100%;width:${Math.min((pct-100)/pct*100,30)}%;background:#ef4444;opacity:0.5;border-radius:0 4px 4px 0"></div>` : ''}
+        </div>
+        ` : ''}
       </div>
-      <div class="pbar-track" style="flex:1;max-width:120px">
-        <div class="pbar-fill" style="width:${budget > 0 ? Math.min(pct, 100) : 0}%;background:${barColor}"></div>
-      </div>
-      <button onclick="setBudgetForCat('${cat}')" style="background:#eef2ff;color:#6366f1;border:none;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:600;cursor:pointer">${budget > 0 ? t('budget_edit') : t('budget_set')}</button>
+      <button onclick="setBudgetForCat('${cat}')" style="background:#eef2ff;color:#6366f1;border:none;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:8px">${budget > 0 ? t('budget_edit') : t('budget_set')}</button>
     </div>`;
   }).join('');
 
@@ -2037,17 +2089,18 @@ function filterTransactions() {
   else if (sort === 'amount_asc') txns.sort((a, b) => Math.abs(a.amount) - Math.abs(b.amount));
 
   const html = txns.map(txn => {
-    const isIncome = txn._isIncome;
+    const isPositive = txn.amount > 0;
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${txn.id}')">
       <div class="flex-1 min-w-0 mr-2">
         <p class="font-semibold text-slate-800 truncate" dir="auto">${txn.description}</p>
         <p class="text-xs text-slate-500">${txn.date}</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <p class="font-semibold ${isIncome ? 'text-green-600' : 'text-red-500'}">${isIncome ? '+' : '-'}${fmt(Math.abs(txn.amount))}</p>
+        <p class="font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'}">${isPositive ? '+' : '-'}${fmt(Math.abs(txn.amount))}</p>
         <p class="text-xs text-slate-500">${tCat(txn.category)}</p>
       </div>
-      <button onclick="event.stopPropagation(); openCatModal('${txn.id}')" class="text-lg text-slate-300 hover:text-slate-600 ml-2 flex-shrink-0">✏</button>
+      <button onclick="event.stopPropagation(); openCatModal('${txn.id}')" class="text-lg text-slate-300 hover:text-slate-600 ml-2 flex-shrink-0" title="Change category">✏</button>
+      <button onclick="event.stopPropagation(); toggleFixed('${txn.id}')" class="text-xs px-1.5 py-0.5 rounded ml-1 flex-shrink-0 ${isFixed(txn) ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}" title="Toggle fixed/variable">${isFixed(txn) ? '🔒' : '🔀'}</button>
       <button onclick="event.stopPropagation(); deleteTxn('${txn.id}')" class="text-lg text-slate-300 hover:text-red-400 ml-1 flex-shrink-0">🗑</button>
     </div>`;
   }).join('');
@@ -2224,7 +2277,7 @@ function switchTab(tab) {
 
   // Highlight correct nav button
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  const navMap = { overview: 0, budget: 1, transactions: 2, insights: 3 };
+  const navMap = { overview: 0, transactions: 1, insights: 2 };
   const navIdx = navMap[tab];
   if (navIdx !== undefined) {
     const btns = document.querySelectorAll('#bottomNav .nav-btn');
