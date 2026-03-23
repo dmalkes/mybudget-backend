@@ -918,13 +918,7 @@ function selectLanguage(btn, lang) {
 function changeLanguage(lang) {
   state.language = lang;
   try { localStorage.setItem(LS.LANGUAGE, lang); } catch(e) {}
-  // Highlight active language button
-  ['English','Portuguese','Hebrew'].forEach(l => {
-    const btn = document.getElementById('langBtn_' + l);
-    if (btn) btn.style.cssText = btn.style.cssText.replace(/background:[^;]+;|border-color:[^;]+;/g, '');
-    if (btn) { btn.style.background = l === lang ? '#6366f1' : ''; btn.style.color = l === lang ? 'white' : ''; btn.style.borderColor = l === lang ? '#6366f1' : '#e2e8f0'; }
-  });
-  toggleSettingsMenu(); // close menu
+  document.getElementById('settingsMenu').style.display = 'none';
   applyLanguage();
   renderDashboard();
 }
@@ -970,7 +964,9 @@ function budgetMonth(t) {
     const d = new Date(t.date);
     const day = d.getDate();
     const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    const isPapaya = t.description && (t.description.includes('Papaya') || t.description.includes('פאפאיה'));
+    // Check raw original text — description may be translated and lose the "Papaya" keyword
+    const rawDesc = t.originalDescription || t.orig || t.description || '';
+    const isPapaya = /פאפאיה|papaya/i.test(rawDesc);
     if (isPapaya && day >= lastDay - 3) {
       const nextMo = d.getMonth() + 1;
       const nextYear = nextMo === 12 ? d.getFullYear() + 1 : d.getFullYear();
