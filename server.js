@@ -726,6 +726,9 @@ app.get('/api/pluggy/test', async (req, res) => {
 
   try {
     console.log('Testing Pluggy SDK...');
+    console.log('Available methods on pluggyClient:', Object.getOwnPropertyNames(Object.getPrototypeOf(pluggyClient)));
+
+    // Try the method with different parameter names
     const testToken = await pluggyClient.createConnectToken({
       clientUserId: 'test-' + Date.now()
     });
@@ -743,7 +746,8 @@ app.get('/api/pluggy/test', async (req, res) => {
       error: 'Pluggy SDK test failed',
       message: error.message,
       code: error.code,
-      statusCode: error.statusCode
+      statusCode: error.statusCode,
+      fullError: error.toString()
     });
   }
 });
