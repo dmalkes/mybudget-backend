@@ -10,12 +10,20 @@ const app = express();
 
 // Pluggy client — uses CLIENT_ID + CLIENT_SECRET from env
 // In production, ensure these are set in Vercel environment variables
-const pluggyClient = process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET
-  ? new PluggyClient({
+let pluggyClient = null;
+try {
+  if (process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET) {
+    pluggyClient = new PluggyClient({
       clientId: process.env.PLUGGY_CLIENT_ID,
       clientSecret: process.env.PLUGGY_CLIENT_SECRET,
-    })
-  : null;
+    });
+    console.log('Pluggy client initialized successfully');
+  } else {
+    console.warn('Pluggy credentials not found in environment variables');
+  }
+} catch (err) {
+  console.error('Failed to initialize Pluggy client:', err.message);
+}
 
 // Middleware
 app.use(cors()); // open — app is a local HTML file, CORS restriction would break file:// users
@@ -708,15 +716,20 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
     // clientUserId should be a stable user ID from your app
     // itemId is optional — if provided, generate a token for reconnecting that Item
 
+    console.log('Creating Pluggy token for user:', clientUserId || 'anonymous');
     const tokenResponse = await pluggyClient.createConnectToken({
       clientUserId: clientUserId || 'anonymous-' + Date.now(),
       itemId // optional: reconnect to existing item
     });
 
+    console.log('Token created successfully:', tokenResponse);
     res.json({ connectToken: tokenResponse.accessToken });
   } catch (error) {
-    console.error('Pluggy connect-token error:', error);
-    res.status(500).json({ error: 'Failed to generate connect token' });
+    console.error('Pluggy connect-token error details:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Failed to generate connect token',
+      details: error.message
+    });
   }
 });
 
