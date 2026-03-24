@@ -68,6 +68,18 @@ app.get('/', (req, res) => {
   res.json({ status: 'MyBudget backend running' });
 });
 
+// Diagnostics endpoint (for debugging)
+app.get('/api/diagnostics', (req, res) => {
+  res.json({
+    pluggyConfigured: !!pluggyClient,
+    pluggyClientId: process.env.PLUGGY_CLIENT_ID ? 'SET' : 'NOT_SET',
+    pluggyClientSecret: process.env.PLUGGY_CLIENT_SECRET ? 'SET' : 'NOT_SET',
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ? 'SET' : 'NOT_SET',
+    nodeEnv: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Try to extract JSON array from Claude response (handles code blocks + truncated responses)
 function extractJSON(text) {
   // Try to find JSON inside code blocks first: ```json [...] ```
@@ -701,6 +713,40 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 // ────────────────────────────────────────────────────────────────────────────
 // Pluggy Open Finance Integration
 // ────────────────────────────────────────────────────────────────────────────
+
+// GET /api/pluggy/test — Test Pluggy SDK directly (for debugging)
+app.get('/api/pluggy/test', async (req, res) => {
+  if (!pluggyClient) {
+    return res.status(503).json({
+      error: 'Pluggy client not initialized',
+      clientId: process.env.PLUGGY_CLIENT_ID ? 'SET' : 'NOT_SET',
+      clientSecret: process.env.PLUGGY_CLIENT_SECRET ? 'SET' : 'NOT_SET'
+    });
+  }
+
+  try {
+    console.log('Testing Pluggy SDK...');
+    const testToken = await pluggyClient.createConnectToken({
+      clientUserId: 'test-' + Date.now()
+    });
+    console.log('Test token created successfully:', testToken);
+    res.json({ success: true, token: testToken });
+  } catch (error) {
+    console.error('Pluggy test error:', {
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      response: error.response?.data || error.response,
+      stack: error.stack
+    });
+    res.status(500).json({
+      error: 'Pluggy SDK test failed',
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode
+    });
+  }
+});
 
 // POST /api/pluggy/connect-token — Generate a short-lived widget token
 // Frontend calls this to get a connectToken for the Pluggy widget
