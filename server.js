@@ -6,25 +6,16 @@ const { PluggyClient } = require('pluggy-sdk');
 
 const path = require('path');
 
-// Load Israeli bank scraper — gracefully handle if package is unavailable
-// NOTE: israeli-bank-scrapers has native dependencies and doesn't build on Vercel.
-// When integrating in production, either:
-// a) Host a separate Node scraper service with native deps
-// b) Use a cloud-hosted scraper API (Finanda, etc.)
-// c) Deploy to Node infrastructure that supports native modules
-let getIsraeliBanks = null;
-let scrapeAccount = null;
-let israeliScraperAvailable = false;
-try {
-  const scrapers = require('israeli-bank-scrapers');
-  getIsraeliBanks = scrapers.getIsraeliBanks;
-  scrapeAccount = scrapers.scrapeAccount;
-  israeliScraperAvailable = true;
-  console.log('Israeli bank scraper loaded successfully');
-} catch (err) {
-  console.warn('Israeli bank scraper not available:', err.message);
-  console.warn('Israeli bank endpoints will return 503 Service Unavailable');
-  console.warn('This is expected on Vercel due to native dependency requirements');
+// Israeli bank scraper service — runs on separate Railway/Render instance
+// Configure via SCRAPER_SERVICE_URL environment variable
+// Falls back to localhost:3001 if env var not set (for local development)
+const SCRAPER_SERVICE_URL = process.env.SCRAPER_SERVICE_URL || 'http://localhost:3001';
+let israeliScraperAvailable = !!process.env.SCRAPER_SERVICE_URL; // Only true if explicitly configured in production
+
+if (process.env.SCRAPER_SERVICE_URL) {
+  console.log(`Israeli bank scraper service configured at: ${SCRAPER_SERVICE_URL}`);
+} else {
+  console.warn('SCRAPER_SERVICE_URL not set. Israeli endpoints will be unavailable unless running locally on port 3001');
 }
 
 const app = express();
@@ -944,36 +935,31 @@ app.delete('/api/pluggy/disconnect/:itemId', async (req, res) => {
 // Israeli Bank Scraper Integration
 // ────────────────────────────────────────────────────────────────────────────
 
-// GET /api/israel/banks — List available Israeli banks
+// GET /api/israel/banks — List available Israeli banks (proxy to scraper service)
 app.get('/api/israel/banks', async (req, res) => {
-  if (!israeliScraperAvailable) {
-    return res.status(503).json({ error: 'Israeli bank scraper service unavailable' });
-  }
-
   try {
-    const banks = await getIsraeliBanks();
+    // Call remote scraper service
+    const response = await fetch(`${SCRAPER_SERVICE_URL}/banks`);
 
-    // Format banks for frontend selection
-    const formattedBanks = banks.map(bank => ({
-      id: bank.companyId,
-      name: bank.companyName,
-      logo: bank.logo || null
-    }));
+    if (!response.ok) {
+      throw new Error(`Scraper service error: ${response.status}`);
+    }
 
-    res.json({ banks: formattedBanks });
+    const data = await response.json();
+    res.json(data);
   } catch (error) {
-    console.error('Error fetching Israeli banks:', error);
-    res.status(500).json({ error: 'Failed to fetch bank list' });
+    console.error('Error fetching Israeli banks from scraper service:', error);
+    res.status(503).json({
+      error: 'Israeli bank scraper service unavailable',
+      details: error.message
+    });
   }
 });
 
-// POST /api/israel/login — Scrape transactions from Israeli bank
+// POST /api/israel/login — Scrape transactions from Israeli bank (proxy to scraper service)
 // Body: { bankId, username, password }
+// Timeout: 90 seconds (scraping can take 30-60 seconds)
 app.post('/api/israel/login', async (req, res) => {
-  if (!israeliScraperAvailable) {
-    return res.status(503).json({ error: 'Israeli bank scraper service unavailable' });
-  }
-
   try {
     const { bankId, username, password } = req.body;
 
@@ -981,33 +967,44 @@ app.post('/api/israel/login', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: bankId, username, password' });
     }
 
-    console.log(`Attempting to scrape Israeli bank: ${bankId}`);
+    console.log(`[${new Date().toISOString()}] Proxying scrape request for bank: ${bankId}`);
 
-    // Scrape transactions from the Israeli bank
-    const result = await scrapeAccount({
-      companyId: bankId,
-      username,
-      password
+    // Call remote scraper service with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+
+    const response = await fetch(`${SCRAPER_SERVICE_URL}/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bankId, username, password }),
+      signal: controller.signal
     });
 
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error(`Scraper service error (${response.status}):`, error);
+      return res.status(response.status).json(error);
+    }
+
+    const result = await response.json();
+
     if (!result.success) {
-      console.error('Scrape failed:', result.errorMessage);
+      console.error('Scrape failed:', result.error);
       return res.status(400).json({
-        error: 'Failed to login or scrape transactions',
-        details: result.errorMessage
+        error: result.error,
+        details: result.details
       });
     }
 
     // Generate session ID and store scraped data
     const sessionId = `il-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Normalize transactions to standard format
-    const normalized = normalizeIsraeliTransactions(result.accounts || []);
-
     israeliSessions.set(sessionId, {
       timestamp: Date.now(),
-      accounts: result.accounts,
-      transactions: normalized,
+      transactions: result.transactions || [],
+      accounts: result.accounts || [],
       bankId
     });
 
@@ -1017,23 +1014,28 @@ app.post('/api/israel/login', async (req, res) => {
       console.log(`Session ${sessionId} cleaned up`);
     }, 60 * 60 * 1000);
 
+    console.log(`[${new Date().toISOString()}] Scrape successful: ${result.transactionCount} transactions from ${bankId}`);
+
     res.json({
       sessionId,
       message: 'Successfully scraped transactions',
-      transactionCount: normalized.length,
-      accounts: (result.accounts || []).map(acc => ({
-        id: acc.accountNumber,
-        name: acc.accountName || acc.accountNumber,
-        type: acc.accountType,
-        balance: acc.balance
-      }))
+      transactionCount: result.transactionCount,
+      accounts: result.accounts
     });
+
   } catch (error) {
-    console.error('Israeli scraper error:', error.message);
-    res.status(500).json({
-      error: 'Scraping failed',
-      details: error.message
-    });
+    console.error('Israeli bank login error:', error.message);
+    if (error.name === 'AbortError') {
+      res.status(504).json({
+        error: 'Scraping timeout',
+        details: 'Bank scraping took too long. Please try again.'
+      });
+    } else {
+      res.status(503).json({
+        error: 'Scraper service unavailable',
+        details: error.message
+      });
+    }
   }
 });
 
@@ -1060,64 +1062,11 @@ app.get('/api/israel/transactions/:sessionId', (req, res) => {
   });
 });
 
-// Helper function: Normalize Israeli bank transactions to standard format
-function normalizeIsraeliTransactions(accounts) {
-  const normalized = [];
-
-  for (const account of accounts || []) {
-    for (const transaction of account.txns || []) {
-      normalized.push({
-        date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        description: transaction.description || transaction.memo || 'Transaction',
-        originalDescription: transaction.memo || transaction.description,
-        amount: transaction.type === 'debit' || transaction.type === 'withdrawal' ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
-        category: classifyIsraeliTransaction(transaction.description || ''),
-        merchant: transaction.description,
-        accountId: account.accountNumber,
-        accountName: account.accountName || account.accountNumber,
-        source: 'israeli-bank-scraper',
-        transactionId: transaction.id || `${account.accountNumber}-${transaction.date}-${transaction.amount}`
-      });
-    }
-  }
-
-  return normalized;
-}
-
-// Helper function: Simple category classification for Israeli transactions
-function classifyIsraeliTransaction(description) {
-  const desc = (description || '').toLowerCase();
-
-  // Supermarkets
-  if (/סופרמרקט|חנות מכולת|רכובה|דיל|לול|שופרסל|צרכיה/i.test(desc)) return 'Groceries';
-  if (/food|restaurant|cafe|pizza|burger|chicken/i.test(desc)) return 'Food & Dining';
-
-  // Utilities
-  if (/חשמל|מים|גז|טלפון|אינטרנט|חברת החשמל|דלק|דלק תחנה/i.test(desc)) return 'Utilities';
-
-  // Transportation
-  if (/תדלוק|תחנה|דלק|הסעות|מונית|אוטובוס|רכבת|תחבורה/i.test(desc)) return 'Transportation';
-
-  // Shopping
-  if (/חנות|קנייה|סחורה|מוצרים|ביגוד|נעליים|בגדים/i.test(desc)) return 'Shopping';
-
-  // Healthcare
-  if (/בית חולים|קליניקה|תרופות|רופא|בריאות|פרמציה|תרופיה/i.test(desc)) return 'Health & Medical';
-
-  // Education
-  if (/בית ספר|אוניברסיטה|קורס|הכשרה|ספרים|חינוך/i.test(desc)) return 'Education';
-
-  // Entertainment
-  if (/קולנוע|בידור|הופעה|קונסרט|ספורט|חדר כושר/i.test(desc)) return 'Entertainment';
-
-  // Default
-  return 'Other';
-}
-
 // Diagnostic endpoint to check deployed version
 app.get('/api/version', (req, res) => {
   res.json({
     timestamp: new Date().toISOString(),
+    scraperServiceUrl: process.env.SCRAPER_SERVICE_URL || 'not configured',
     israeliScraperAvailable: israeliScraperAvailable,
     nodeVersion: process.version,
     env: process.env.NODE_ENV || 'production'
@@ -1128,5 +1077,5 @@ app.get('/api/version', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`MyBudget backend running on port ${PORT}`);
-  console.log(`Israeli scraper available: ${israeliScraperAvailable}`);
+  console.log(`Israeli scraper service: ${process.env.SCRAPER_SERVICE_URL || 'not configured (local fallback: localhost:3001)'}`);
 });
