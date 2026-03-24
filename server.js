@@ -714,51 +714,34 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 // Pluggy Open Finance Integration
 // ────────────────────────────────────────────────────────────────────────────
 
-// GET /api/pluggy/test — Test Pluggy API directly (for debugging)
+// GET /api/pluggy/test — Test Pluggy SDK (for debugging)
 app.get('/api/pluggy/test', async (req, res) => {
-  const clientId = process.env.PLUGGY_CLIENT_ID;
-  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
+  if (!pluggyClient) {
     return res.status(503).json({
-      error: 'Pluggy credentials not configured',
-      clientId: clientId ? 'SET' : 'NOT_SET',
-      clientSecret: clientSecret ? 'SET' : 'NOT_SET'
+      error: 'Pluggy client not initialized'
     });
   }
 
   try {
-    console.log('Testing Pluggy API...');
-    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const response = await fetch('https://api.pluggy.ai/connect_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`
-      },
-      body: JSON.stringify({
-        clientUserId: 'test-' + Date.now()
-      })
+    console.log('Testing Pluggy SDK...');
+    const testToken = await pluggyClient.createConnectToken({
+      clientUserId: 'test-' + Date.now()
     });
 
-    const data = await response.json();
+    console.log('Test token response type:', typeof testToken);
+    console.log('Test token keys:', Object.keys(testToken || {}));
 
-    if (!response.ok) {
-      console.error('Pluggy API error response:', data);
-      return res.status(response.status).json({
-        error: 'Pluggy API test failed',
-        message: data.message || 'Unknown error',
-        status: response.status
-      });
-    }
-
-    console.log('Test token created successfully');
-    res.json({ success: true, token: data.accessToken });
+    res.json({
+      success: true,
+      token: testToken.accessToken || testToken.access_token || testToken,
+      responseKeys: Object.keys(testToken || {})
+    });
   } catch (error) {
     console.error('Pluggy test error:', error.message);
     res.status(500).json({
-      error: 'Pluggy API test failed',
-      message: error.message
+      error: 'Pluggy test failed',
+      message: error.message,
+      errorType: error.constructor?.name
     });
   }
 });
@@ -766,12 +749,9 @@ app.get('/api/pluggy/test', async (req, res) => {
 // POST /api/pluggy/connect-token — Generate a short-lived widget token
 // Frontend calls this to get a connectToken for the Pluggy widget
 app.post('/api/pluggy/connect-token', async (req, res) => {
-  const clientId = process.env.PLUGGY_CLIENT_ID;
-  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
+  if (!pluggyClient) {
     return res.status(503).json({
-      error: 'Pluggy not configured. Set PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in environment.'
+      error: 'Pluggy not configured'
     });
   }
 
@@ -779,39 +759,31 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
     const { clientUserId, itemId } = req.body;
     const userId = clientUserId || 'anonymous-' + Date.now();
 
-    console.log('Creating Pluggy token for user:', userId);
+    console.log('Creating Pluggy token for user:', userId, 'itemId:', itemId);
 
-    // Call Pluggy API directly via HTTP (Basic Auth) to bypass SDK issues
-    const body = {
+    // Use the SDK but only pass clientUserId, no other params
+    const tokenResponse = await pluggyClient.createConnectToken({
       clientUserId: userId
-    };
-    if (itemId) {
-      body.itemId = itemId;
-    }
-
-    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const response = await fetch('https://api.pluggy.ai/connect_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`
-      },
-      body: JSON.stringify(body)
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Pluggy API error: ${errorData.message || response.statusText}`);
-    }
+    console.log('Token created successfully, type:', typeof tokenResponse, 'keys:', Object.keys(tokenResponse || {}));
 
-    const data = await response.json();
-    console.log('Token created successfully');
-    res.json({ connectToken: data.accessToken });
+    // Handle different response structures
+    const token = tokenResponse.accessToken || tokenResponse.access_token || tokenResponse;
+    res.json({ connectToken: token });
   } catch (error) {
-    console.error('Pluggy connect-token error:', error.response?.data || error.message);
+    console.error('Pluggy error - message:', error.message);
+    console.error('Pluggy error - full:', JSON.stringify({
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      response: error.response,
+      constructor: error.constructor?.name
+    }));
+
     res.status(500).json({
       error: 'Failed to generate connect token',
-      details: error.response?.data?.message || error.message
+      details: error.message
     });
   }
 });
