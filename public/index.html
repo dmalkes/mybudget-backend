@@ -1537,8 +1537,9 @@ async function initPluggyWidget() {
       }
     });
 
-    // Call show() to actually display the widget modal
-    pluggyWidget.show();
+    // Initialize and show the widget modal
+    await pluggyWidget.init();
+    await pluggyWidget.show();
   } catch (err) {
     console.error('initPluggyWidget error:', err);
     alert('Error opening bank connection: ' + err.message);
