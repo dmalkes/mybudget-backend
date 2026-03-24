@@ -1521,7 +1521,7 @@ async function initPluggyWidget() {
     const { connectToken } = await response.json();
 
     // Step 2: Open the Pluggy widget with the token
-    window.PluggyConnect({
+    new window.PluggyConnect({
       connectToken,
       onSuccess: async (data) => {
         console.log('Pluggy connection successful:', data);
