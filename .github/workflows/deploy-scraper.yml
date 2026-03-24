@@ -1,0 +1,24 @@
+name: Deploy Israeli Scraper to Railway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'israeli-scraper-service/**'
+      - '.github/workflows/deploy-scraper.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm install -g @railway/cli
+          cd israeli-scraper-service
+          railway up --service mybudget-israeli-scraper
+        shell: bash
