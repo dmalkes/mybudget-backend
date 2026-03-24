@@ -1806,6 +1806,8 @@ function checkExistingSession() {
       // Onboarded but no data, show upload page
       document.getElementById('welcomePage').classList.remove('active');
       document.getElementById('uploadPage').classList.add('active');
+      // Show Pluggy button if applicable
+      showPluggyButton();
     }
   }
   // else: show welcome page (already active by default)
