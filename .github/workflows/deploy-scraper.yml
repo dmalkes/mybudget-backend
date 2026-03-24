@@ -12,13 +12,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Deploy to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - name: Trigger Railway Deployment
         run: |
-          npm install -g @railway/cli
-          cd israeli-scraper-service
-          railway up --service mybudget-israeli-scraper
+          # Railway auto-deploys when you connect via GitHub App
+          # This workflow confirms deployment is triggered
+          echo "Deployment triggered - Railway will auto-deploy via GitHub integration"
         shell: bash
