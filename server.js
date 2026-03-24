@@ -728,10 +728,9 @@ app.get('/api/pluggy/test', async (req, res) => {
 
   try {
     console.log('Testing Pluggy SDK...');
-    console.log('SDK type:', typeof pluggyClient);
-    console.log('SDK methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(pluggyClient)).slice(0, 20));
 
-    // Try calling the method
+    // Try calling with clientUserId
+    console.log('Attempting: createConnectToken({ clientUserId })');
     const testToken = await pluggyClient.createConnectToken({
       clientUserId: 'test-' + Date.now()
     });
@@ -739,10 +738,11 @@ app.get('/api/pluggy/test', async (req, res) => {
     console.log('✅ SUCCESS - Test token created');
     console.log('Response type:', typeof testToken);
     console.log('Response keys:', Object.keys(testToken || {}));
+    console.log('AccessToken exists:', !!testToken?.accessToken);
 
     res.json({
       success: true,
-      token: testToken.accessToken || testToken.access_token || testToken,
+      accessToken: testToken.accessToken,
       responseKeys: Object.keys(testToken || {})
     });
   } catch (error) {
@@ -777,15 +777,30 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
 
     console.log('Creating Pluggy token for user:', userId, 'itemId:', itemId);
 
-    // Use the SDK but only pass clientUserId, no other params
-    const tokenResponse = await pluggyClient.createConnectToken({
-      clientUserId: userId
-    });
+    // Build params object - only include fields if provided
+    const params = {};
+    if (userId) params.clientUserId = userId;
+    if (itemId) params.itemId = itemId;
 
-    console.log('Token created successfully, type:', typeof tokenResponse, 'keys:', Object.keys(tokenResponse || {}));
+    // Try with parameters if provided, otherwise call with no params
+    let tokenResponse;
+    if (Object.keys(params).length > 0) {
+      console.log('Calling createConnectToken with params:', Object.keys(params));
+      tokenResponse = await pluggyClient.createConnectToken(params);
+    } else {
+      console.log('Calling createConnectToken with no params');
+      tokenResponse = await pluggyClient.createConnectToken();
+    }
 
-    // Handle different response structures
-    const token = tokenResponse.accessToken || tokenResponse.access_token || tokenResponse;
+    console.log('✅ Token created successfully');
+    console.log('Response type:', typeof tokenResponse);
+    console.log('Response keys:', Object.keys(tokenResponse || {}));
+
+    // The SDK returns { accessToken: "..." }
+    const token = tokenResponse?.accessToken;
+    if (!token) {
+      throw new Error(`No accessToken in response: ${JSON.stringify(tokenResponse)}`);
+    }
     res.json({ connectToken: token });
   } catch (error) {
     console.error('Pluggy error - message:', error.message);
