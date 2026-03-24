@@ -150,3 +150,4 @@ Once the Railway URL is added to Vercel, your full integration is live:
 - ✅ Brazil: Pluggy bank connections (production)
 - ✅ Israel: Real bank scraping with Chromium (production)
 - ✅ Auto-deployment: Changes push → GitHub → Railway (automatic)
+# Deployment triggered
