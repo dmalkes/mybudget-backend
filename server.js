@@ -777,20 +777,12 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
 
     console.log('Creating Pluggy token for user:', userId, 'itemId:', itemId);
 
-    // Build params object - only include fields if provided
-    const params = {};
-    if (userId) params.clientUserId = userId;
-    if (itemId) params.itemId = itemId;
-
-    // Try with parameters if provided, otherwise call with no params
-    let tokenResponse;
-    if (Object.keys(params).length > 0) {
-      console.log('Calling createConnectToken with params:', Object.keys(params));
-      tokenResponse = await pluggyClient.createConnectToken(params);
-    } else {
-      console.log('Calling createConnectToken with no params');
-      tokenResponse = await pluggyClient.createConnectToken();
-    }
+    // Only pass clientUserId, NOT itemId (it causes "must be a UUID" error)
+    const params = {
+      clientUserId: userId
+    };
+    console.log('Calling createConnectToken with clientUserId only');
+    const tokenResponse = await pluggyClient.createConnectToken(params);
 
     console.log('✅ Token created successfully');
     console.log('Response type:', typeof tokenResponse);
