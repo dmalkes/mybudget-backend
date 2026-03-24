@@ -718,18 +718,27 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 app.get('/api/pluggy/test', async (req, res) => {
   if (!pluggyClient) {
     return res.status(503).json({
-      error: 'Pluggy client not initialized'
+      error: 'Pluggy client not initialized',
+      credentials: {
+        clientId: process.env.PLUGGY_CLIENT_ID ? 'SET' : 'NOT_SET',
+        clientSecret: process.env.PLUGGY_CLIENT_SECRET ? 'SET' : 'NOT_SET'
+      }
     });
   }
 
   try {
     console.log('Testing Pluggy SDK...');
+    console.log('SDK type:', typeof pluggyClient);
+    console.log('SDK methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(pluggyClient)).slice(0, 20));
+
+    // Try calling the method
     const testToken = await pluggyClient.createConnectToken({
       clientUserId: 'test-' + Date.now()
     });
 
-    console.log('Test token response type:', typeof testToken);
-    console.log('Test token keys:', Object.keys(testToken || {}));
+    console.log('✅ SUCCESS - Test token created');
+    console.log('Response type:', typeof testToken);
+    console.log('Response keys:', Object.keys(testToken || {}));
 
     res.json({
       success: true,
@@ -737,11 +746,18 @@ app.get('/api/pluggy/test', async (req, res) => {
       responseKeys: Object.keys(testToken || {})
     });
   } catch (error) {
-    console.error('Pluggy test error:', error.message);
-    res.status(500).json({
-      error: 'Pluggy test failed',
+    console.error('❌ FAILED - Pluggy test error');
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error statusCode:', error.statusCode);
+    console.error('Full error:', error);
+
+    res.status(error.statusCode || 500).json({
+      error: 'Pluggy SDK test failed',
       message: error.message,
-      errorType: error.constructor?.name
+      code: error.code,
+      statusCode: error.statusCode,
+      hint: 'Verify PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET are valid in your Pluggy account'
     });
   }
 });
