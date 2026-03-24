@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+  <script src="https://cdn.pluggy.ai/connect/v1.0.0/pluggy-connect.umd.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
@@ -275,6 +276,14 @@
     </div>
     <button onclick="document.getElementById('uploadFileInput').click()" class="onboarding-button secondary" style="margin-bottom:12px" data-i18n="upload_browse">Browse files</button>
     <button onclick="useTestData()" class="onboarding-button secondary" style="border-color:#10b981;color:#10b981" data-i18n="upload_sample">Try with sample data</button>
+
+    <!-- Pluggy Bank Connection (Brazil) -->
+    <div id="pluggySection" class="mt-6 pt-6 border-t border-slate-200">
+      <p class="text-xs font-semibold text-slate-600 text-center mb-3" style="text-transform:uppercase;letter-spacing:0.05em">OR</p>
+      <button id="connectBankBtn" onclick="initPluggyWidget()" class="onboarding-button secondary" style="border-color:#6366f1;color:#6366f1;width:100%;display:none">🏦 Connect Your Bank (Brazil)</button>
+      <p class="text-xs text-slate-500 text-center mt-2" id="pluggyNote" style="display:none">Securely connect your bank account for automatic transaction sync</p>
+    </div>
+
     <div id="uploadFileList" class="mt-6 space-y-2"></div>
     <button id="uploadProcessBtn" class="hidden onboarding-button primary" onclick="processUploadedFiles()" data-i18n="upload_analyze">Analyze Files</button>
     <p class="text-xs text-slate-500 text-center mt-8" data-i18n="upload_privacy">🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.</p>
@@ -1333,6 +1342,11 @@ function nextPage(from) {
 
   document.querySelectorAll('.onboarding-page, .upload-page').forEach(p => p.classList.remove('active'));
   document.getElementById(pages[from]).classList.add('active');
+
+  // Show Pluggy button if going to upload page and country is Brazil
+  if (pages[from] === 'uploadPage') {
+    showPluggyButton();
+  }
 }
 
 function prevPage(pageId) {
@@ -1480,6 +1494,120 @@ async function processFiles() {
     console.error('Process error:', e);
     hideProcessing();
     alert('Error: ' + e.message);
+  }
+}
+
+// ─────────────────────────────────────
+// Pluggy Bank Connection Integration
+// ─────────────────────────────────────
+
+// Initialize Pluggy widget (connect bank account for Brazil)
+async function initPluggyWidget() {
+  try {
+    // Step 1: Get a connectToken from the backend
+    const response = await fetch('/api/pluggy/connect-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientUserId: 'user-' + Date.now() })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      console.error('Failed to get connect token:', err);
+      alert('Unable to connect to Pluggy. Please try uploading a file instead.');
+      return;
+    }
+
+    const { connectToken } = await response.json();
+
+    // Step 2: Open the Pluggy widget with the token
+    window.PluggyConnect({
+      connectToken,
+      onSuccess: async (data) => {
+        console.log('Pluggy connection successful:', data);
+        // data.item contains { id: itemId, connectorId, status, error, ... }
+        await syncPluggyTransactions(data.item.id);
+      },
+      onError: (error) => {
+        console.error('Pluggy widget error:', error);
+        alert('Bank connection failed: ' + error.message);
+      },
+      onClose: () => {
+        console.log('Pluggy widget closed');
+      }
+    });
+  } catch (err) {
+    console.error('initPluggyWidget error:', err);
+    alert('Error opening bank connection: ' + err.message);
+  }
+}
+
+// Fetch transactions from Pluggy and merge into app state
+async function syncPluggyTransactions(itemId) {
+  try {
+    showProcessing();
+
+    // Fetch transactions from the connected bank account
+    const response = await fetch(`/api/pluggy/sync/${itemId}`);
+    if (!response.ok) throw new Error('Failed to fetch transactions');
+
+    const { transactions: pluggyTxns, accounts } = await response.json();
+
+    if (!pluggyTxns || pluggyTxns.length === 0) {
+      alert('No transactions found for this account. Try uploading a bank statement instead.');
+      hideProcessing();
+      return;
+    }
+
+    // Normalize to our internal format
+    const candidates = pluggyTxns.map(t => ({
+      date: t.date,
+      description: t.description,
+      originalDescription: t.originalDescription,
+      amount: t.amount, // already signed
+      category: t.category || 'Other',
+      orig: t.originalDescription
+    }));
+
+    // Merge with existing transactions
+    const { added, skipped, income, transfers, expenses } = mergeTransactions(candidates);
+    saveTransactions();
+    hideProcessing();
+
+    // Store the itemId for future syncs
+    state.pluggyItemId = itemId;
+    state.pluggyAccounts = accounts;
+    localStorage.setItem('pluggyItemId', itemId);
+    localStorage.setItem('pluggyAccounts', JSON.stringify(accounts));
+
+    // Start the app
+    startApp();
+
+    // Show success message
+    const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
+    const msg = `✅ Connected ${accounts?.length || 1} account${accounts?.length!==1?'s':''} — Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`;
+    showToast(msg, 5000);
+  } catch (err) {
+    console.error('syncPluggyTransactions error:', err);
+    hideProcessing();
+    alert('Error syncing transactions: ' + err.message);
+  }
+}
+
+// Show/hide the Pluggy button based on whether it's configured
+function showPluggyButton() {
+  // For now, always show it if the backend is running (simplest approach)
+  // In production, check if PLUGGY_CLIENT_ID is set on the backend
+  const pluggyBtn = document.getElementById('connectBankBtn');
+  const pluggyNote = document.getElementById('pluggyNote');
+
+  if (state.onboarding.country === 'Brazil') {
+    // Only show for Brazil users (Pluggy currently targets Brazil)
+    pluggyBtn.style.display = 'block';
+    pluggyNote.style.display = 'block';
+  } else {
+    pluggyBtn.style.display = 'none';
+    pluggyNote.style.display = 'none';
   }
 }
 

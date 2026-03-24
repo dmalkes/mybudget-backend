@@ -2,10 +2,20 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
+const { Pluggy } = require('pluggy-sdk');
 
 const path = require('path');
 
 const app = express();
+
+// Pluggy client — uses CLIENT_ID + CLIENT_SECRET from env
+// In production, ensure these are set in Vercel environment variables
+const pluggyClient = process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET
+  ? new Pluggy({
+      clientId: process.env.PLUGGY_CLIENT_ID,
+      clientSecret: process.env.PLUGGY_CLIENT_SECRET,
+    })
+  : null;
 
 // Middleware
 app.use(cors()); // open — app is a local HTML file, CORS restriction would break file:// users
@@ -677,6 +687,138 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Pluggy Open Finance Integration
+// ────────────────────────────────────────────────────────────────────────────
+
+// POST /api/pluggy/connect-token — Generate a short-lived widget token
+// Frontend calls this to get a connectToken for the Pluggy widget
+app.post('/api/pluggy/connect-token', async (req, res) => {
+  if (!pluggyClient) {
+    return res.status(503).json({
+      error: 'Pluggy not configured. Set PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in environment.'
+    });
+  }
+
+  try {
+    const { clientUserId, itemId } = req.body;
+    // clientUserId should be a stable user ID from your app
+    // itemId is optional — if provided, generate a token for reconnecting that Item
+
+    const connectToken = await pluggyClient.createConnectToken({
+      clientUserId: clientUserId || 'anonymous-' + Date.now(),
+      itemId // optional: reconnect to existing item
+    });
+
+    res.json({ connectToken });
+  } catch (error) {
+    console.error('Pluggy connect-token error:', error);
+    res.status(500).json({ error: 'Failed to generate connect token' });
+  }
+});
+
+// POST /api/pluggy/webhook — Receive item creation/update events from Pluggy
+// Pluggy calls this when a user connects a bank account
+app.post('/api/pluggy/webhook', async (req, res) => {
+  try {
+    const { event, eventId, clientUserId, itemId, error } = req.body;
+
+    console.log(`[Pluggy Webhook] Event: ${event}, ItemID: ${itemId}, ClientUserID: ${clientUserId}`);
+
+    if (event === 'item/created' || event === 'item/updated') {
+      // Item successfully connected — fetch its details and store in your DB
+      // For now, just acknowledge. In production, store the itemId against the user.
+      console.log(`Item ${itemId} for user ${clientUserId} is ready`);
+    }
+
+    if (event === 'item/error') {
+      console.error(`Item ${itemId} error:`, error);
+    }
+
+    // Always return 200 to confirm webhook receipt
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Webhook processing error:', err);
+    res.status(200).json({ success: true }); // Still return 200 to not spam retries
+  }
+});
+
+// GET /api/pluggy/sync/:itemId — Fetch transactions from a connected bank account
+// Call this after an Item is successfully connected to download transactions
+app.get('/api/pluggy/sync/:itemId', async (req, res) => {
+  if (!pluggyClient) {
+    return res.status(503).json({ error: 'Pluggy not configured' });
+  }
+
+  try {
+    const { itemId } = req.params;
+    const { fromDate, toDate } = req.query;
+    // fromDate, toDate: optional ISO 8601 strings for filtering (default: last 90 days)
+
+    // Get all accounts linked to this Item
+    const accounts = await pluggyClient.getAccounts({ itemId });
+
+    if (!accounts.results?.length) {
+      return res.json({ transactions: [], accounts: [] });
+    }
+
+    // Fetch transactions from all accounts
+    const allTransactions = [];
+    for (const account of accounts.results) {
+      try {
+        const txns = await pluggyClient.getTransactions({
+          accountId: account.id,
+          from: fromDate ? new Date(fromDate) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+          to: toDate ? new Date(toDate) : new Date(),
+        });
+
+        // Normalize Pluggy transaction format to our internal format
+        const normalized = txns.results.map(t => ({
+          date: t.date.split('T')[0], // ISO YYYY-MM-DD
+          description: t.description,
+          originalDescription: t.descriptionRaw,
+          amount: t.type === 'DEBIT' ? -Math.abs(t.amount) : Math.abs(t.amount), // Negative = expense
+          category: t.category || 'Other',
+          merchant: t.merchant?.name,
+          paymentMethod: t.paymentData?.paymentMethod,
+          accountId: account.id,
+          accountName: account.name,
+          source: 'pluggy'
+        }));
+
+        allTransactions.push(...normalized);
+      } catch (err) {
+        console.error(`Error fetching transactions for account ${account.id}:`, err);
+      }
+    }
+
+    res.json({ transactions: allTransactions, accounts: accounts.results });
+  } catch (error) {
+    console.error('Pluggy sync error:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// DELETE /api/pluggy/disconnect/:itemId — Disconnect a bank account
+// Removes the stored credentials/token and deletes data from Pluggy
+app.delete('/api/pluggy/disconnect/:itemId', async (req, res) => {
+  if (!pluggyClient) {
+    return res.status(503).json({ error: 'Pluggy not configured' });
+  }
+
+  try {
+    const { itemId } = req.params;
+
+    // Delete the Item from Pluggy (this triggers data deletion on their end)
+    await pluggyClient.deleteItem(itemId);
+
+    res.json({ success: true, message: `Item ${itemId} disconnected and data scheduled for deletion` });
+  } catch (error) {
+    console.error('Pluggy disconnect error:', error);
+    res.status(500).json({ error: 'Failed to disconnect' });
   }
 });
 
