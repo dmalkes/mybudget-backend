@@ -3,6 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
 const { PluggyClient } = require('pluggy-sdk');
+const { getIsraeliBanks, scrapeAccount } = require('israeli-bank-scrapers');
 
 const path = require('path');
 
@@ -24,6 +25,10 @@ try {
 } catch (err) {
   console.error('Failed to initialize Pluggy client:', err.message);
 }
+
+// In-memory storage for Israeli bank scraper sessions
+// In production, use a database (Redis, MongoDB, etc.)
+const israeliSessions = new Map();
 
 // Middleware
 app.use(cors()); // open — app is a local HTML file, CORS restriction would break file:// users
@@ -914,6 +919,172 @@ app.delete('/api/pluggy/disconnect/:itemId', async (req, res) => {
     res.status(500).json({ error: 'Failed to disconnect' });
   }
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Israeli Bank Scraper Integration
+// ────────────────────────────────────────────────────────────────────────────
+
+// GET /api/israel/banks — List available Israeli banks
+app.get('/api/israel/banks', async (req, res) => {
+  try {
+    const banks = await getIsraeliBanks();
+
+    // Format banks for frontend selection
+    const formattedBanks = banks.map(bank => ({
+      id: bank.companyId,
+      name: bank.companyName,
+      logo: bank.logo || null
+    }));
+
+    res.json({ banks: formattedBanks });
+  } catch (error) {
+    console.error('Error fetching Israeli banks:', error);
+    res.status(500).json({ error: 'Failed to fetch bank list' });
+  }
+});
+
+// POST /api/israel/login — Scrape transactions from Israeli bank
+// Body: { bankId, username, password }
+app.post('/api/israel/login', async (req, res) => {
+  try {
+    const { bankId, username, password } = req.body;
+
+    if (!bankId || !username || !password) {
+      return res.status(400).json({ error: 'Missing required fields: bankId, username, password' });
+    }
+
+    console.log(`Attempting to scrape Israeli bank: ${bankId}`);
+
+    // Scrape transactions from the Israeli bank
+    const result = await scrapeAccount({
+      companyId: bankId,
+      username,
+      password
+    });
+
+    if (!result.success) {
+      console.error('Scrape failed:', result.errorMessage);
+      return res.status(400).json({
+        error: 'Failed to login or scrape transactions',
+        details: result.errorMessage
+      });
+    }
+
+    // Generate session ID and store scraped data
+    const sessionId = `il-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Normalize transactions to standard format
+    const normalized = normalizeIsraeliTransactions(result.accounts || []);
+
+    israeliSessions.set(sessionId, {
+      timestamp: Date.now(),
+      accounts: result.accounts,
+      transactions: normalized,
+      bankId
+    });
+
+    // Auto-cleanup after 1 hour
+    setTimeout(() => {
+      israeliSessions.delete(sessionId);
+      console.log(`Session ${sessionId} cleaned up`);
+    }, 60 * 60 * 1000);
+
+    res.json({
+      sessionId,
+      message: 'Successfully scraped transactions',
+      transactionCount: normalized.length,
+      accounts: (result.accounts || []).map(acc => ({
+        id: acc.accountNumber,
+        name: acc.accountName || acc.accountNumber,
+        type: acc.accountType,
+        balance: acc.balance
+      }))
+    });
+  } catch (error) {
+    console.error('Israeli scraper error:', error.message);
+    res.status(500).json({
+      error: 'Scraping failed',
+      details: error.message
+    });
+  }
+});
+
+// GET /api/israel/transactions/:sessionId — Get scraped transactions
+app.get('/api/israel/transactions/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+
+  const session = israeliSessions.get(sessionId);
+
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found or expired' });
+  }
+
+  // Check if session is older than 1 hour
+  if (Date.now() - session.timestamp > 60 * 60 * 1000) {
+    israeliSessions.delete(sessionId);
+    return res.status(404).json({ error: 'Session expired' });
+  }
+
+  res.json({
+    transactions: session.transactions,
+    accounts: session.accounts,
+    bankId: session.bankId
+  });
+});
+
+// Helper function: Normalize Israeli bank transactions to standard format
+function normalizeIsraeliTransactions(accounts) {
+  const normalized = [];
+
+  for (const account of accounts || []) {
+    for (const transaction of account.txns || []) {
+      normalized.push({
+        date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        description: transaction.description || transaction.memo || 'Transaction',
+        originalDescription: transaction.memo || transaction.description,
+        amount: transaction.type === 'debit' || transaction.type === 'withdrawal' ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
+        category: classifyIsraeliTransaction(transaction.description || ''),
+        merchant: transaction.description,
+        accountId: account.accountNumber,
+        accountName: account.accountName || account.accountNumber,
+        source: 'israeli-bank-scraper',
+        transactionId: transaction.id || `${account.accountNumber}-${transaction.date}-${transaction.amount}`
+      });
+    }
+  }
+
+  return normalized;
+}
+
+// Helper function: Simple category classification for Israeli transactions
+function classifyIsraeliTransaction(description) {
+  const desc = (description || '').toLowerCase();
+
+  // Supermarkets
+  if (/סופרמרקט|חנות מכולת|רכובה|דיל|לול|שופרסל|צרכיה/i.test(desc)) return 'Groceries';
+  if (/food|restaurant|cafe|pizza|burger|chicken/i.test(desc)) return 'Food & Dining';
+
+  // Utilities
+  if (/חשמל|מים|גז|טלפון|אינטרנט|חברת החשמל|דלק|דלק תחנה/i.test(desc)) return 'Utilities';
+
+  // Transportation
+  if (/תדלוק|תחנה|דלק|הסעות|מונית|אוטובוס|רכבת|תחבורה/i.test(desc)) return 'Transportation';
+
+  // Shopping
+  if (/חנות|קנייה|סחורה|מוצרים|ביגוד|נעליים|בגדים/i.test(desc)) return 'Shopping';
+
+  // Healthcare
+  if (/בית חולים|קליניקה|תרופות|רופא|בריאות|פרמציה|תרופיה/i.test(desc)) return 'Health & Medical';
+
+  // Education
+  if (/בית ספר|אוניברסיטה|קורס|הכשרה|ספרים|חינוך/i.test(desc)) return 'Education';
+
+  // Entertainment
+  if (/קולנוע|בידור|הופעה|קונסרט|ספורט|חדר כושר/i.test(desc)) return 'Entertainment';
+
+  // Default
+  return 'Other';
+}
 
 // Start server
 const PORT = process.env.PORT || 3000;
