@@ -727,9 +727,7 @@ app.get('/api/pluggy/test', async (req, res) => {
   try {
     console.log('Testing Pluggy SDK...');
     const testToken = await pluggyClient.createConnectToken({
-      options: {
-        clientUserId: 'test-' + Date.now()
-      }
+      clientUserId: 'test-' + Date.now()
     });
     console.log('Test token created successfully:', testToken);
     res.json({ success: true, token: testToken });
@@ -765,10 +763,9 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
     // itemId is optional — if provided, generate a token for reconnecting that Item
 
     console.log('Creating Pluggy token for user:', clientUserId || 'anonymous');
+    // According to Pluggy docs, createConnectToken expects specific structure
     const tokenParams = {
-      options: {
-        clientUserId: clientUserId || 'anonymous-' + Date.now()
-      }
+      clientUserId: clientUserId || 'anonymous-' + Date.now()
     };
     // Only include itemId if it's provided (for reconnecting to existing account)
     if (itemId) {
