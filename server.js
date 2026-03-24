@@ -7,6 +7,11 @@ const { PluggyClient } = require('pluggy-sdk');
 const path = require('path');
 
 // Load Israeli bank scraper — gracefully handle if package is unavailable
+// NOTE: israeli-bank-scrapers has native dependencies and doesn't build on Vercel.
+// When integrating in production, either:
+// a) Host a separate Node scraper service with native deps
+// b) Use a cloud-hosted scraper API (Finanda, etc.)
+// c) Deploy to Node infrastructure that supports native modules
 let getIsraeliBanks = null;
 let scrapeAccount = null;
 let israeliScraperAvailable = false;
@@ -19,6 +24,7 @@ try {
 } catch (err) {
   console.warn('Israeli bank scraper not available:', err.message);
   console.warn('Israeli bank endpoints will return 503 Service Unavailable');
+  console.warn('This is expected on Vercel due to native dependency requirements');
 }
 
 const app = express();
