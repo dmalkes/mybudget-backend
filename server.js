@@ -708,12 +708,12 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
     // clientUserId should be a stable user ID from your app
     // itemId is optional — if provided, generate a token for reconnecting that Item
 
-    const connectToken = await pluggyClient.createConnectToken({
+    const tokenResponse = await pluggyClient.createConnectToken({
       clientUserId: clientUserId || 'anonymous-' + Date.now(),
       itemId // optional: reconnect to existing item
     });
 
-    res.json({ connectToken });
+    res.json({ connectToken: tokenResponse.accessToken });
   } catch (error) {
     console.error('Pluggy connect-token error:', error);
     res.status(500).json({ error: 'Failed to generate connect token' });
