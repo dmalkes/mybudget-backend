@@ -729,9 +729,9 @@ app.get('/api/pluggy/test', async (req, res) => {
   try {
     console.log('Testing Pluggy SDK...');
 
-    // Try calling with clientUserId
-    console.log('Attempting: createConnectToken({ clientUserId })');
-    const testToken = await pluggyClient.createConnectToken({
+    // Try calling with correct signature: createConnectToken(itemId, options)
+    console.log('Attempting: createConnectToken(undefined, { clientUserId })');
+    const testToken = await pluggyClient.createConnectToken(undefined, {
       clientUserId: 'test-' + Date.now()
     });
 
@@ -777,12 +777,13 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
 
     console.log('Creating Pluggy token for user:', userId, 'itemId:', itemId);
 
-    // Only pass clientUserId, NOT itemId (it causes "must be a UUID" error)
-    const params = {
+    // SDK signature: createConnectToken(itemId, options)
+    // When creating new (no update): pass undefined for itemId, then options object
+    const options = {
       clientUserId: userId
     };
-    console.log('Calling createConnectToken with clientUserId only');
-    const tokenResponse = await pluggyClient.createConnectToken(params);
+    console.log('Calling createConnectToken with signature: createConnectToken(undefined, options)');
+    const tokenResponse = await pluggyClient.createConnectToken(undefined, options);
 
     console.log('✅ Token created successfully');
     console.log('Response type:', typeof tokenResponse);
