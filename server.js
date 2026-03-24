@@ -717,10 +717,14 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
     // itemId is optional — if provided, generate a token for reconnecting that Item
 
     console.log('Creating Pluggy token for user:', clientUserId || 'anonymous');
-    const tokenResponse = await pluggyClient.createConnectToken({
-      clientUserId: clientUserId || 'anonymous-' + Date.now(),
-      itemId // optional: reconnect to existing item
-    });
+    const tokenParams = {
+      clientUserId: clientUserId || 'anonymous-' + Date.now()
+    };
+    // Only include itemId if it's provided (for reconnecting to existing account)
+    if (itemId) {
+      tokenParams.itemId = itemId;
+    }
+    const tokenResponse = await pluggyClient.createConnectToken(tokenParams);
 
     console.log('Token created successfully:', tokenResponse);
     res.json({ connectToken: tokenResponse.accessToken });
