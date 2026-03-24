@@ -714,40 +714,51 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 // Pluggy Open Finance Integration
 // ────────────────────────────────────────────────────────────────────────────
 
-// GET /api/pluggy/test — Test Pluggy SDK directly (for debugging)
+// GET /api/pluggy/test — Test Pluggy API directly (for debugging)
 app.get('/api/pluggy/test', async (req, res) => {
-  if (!pluggyClient) {
+  const clientId = process.env.PLUGGY_CLIENT_ID;
+  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
     return res.status(503).json({
-      error: 'Pluggy client not initialized',
-      clientId: process.env.PLUGGY_CLIENT_ID ? 'SET' : 'NOT_SET',
-      clientSecret: process.env.PLUGGY_CLIENT_SECRET ? 'SET' : 'NOT_SET'
+      error: 'Pluggy credentials not configured',
+      clientId: clientId ? 'SET' : 'NOT_SET',
+      clientSecret: clientSecret ? 'SET' : 'NOT_SET'
     });
   }
 
   try {
-    console.log('Testing Pluggy SDK...');
-    console.log('Available methods on pluggyClient:', Object.getOwnPropertyNames(Object.getPrototypeOf(pluggyClient)));
+    console.log('Testing Pluggy API...');
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const response = await fetch('https://api.pluggy.ai/connect_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`
+      },
+      body: JSON.stringify({
+        clientUserId: 'test-' + Date.now()
+      })
+    });
 
-    // Try the method with different parameter names
-    const testToken = await pluggyClient.createConnectToken({
-      clientUserId: 'test-' + Date.now()
-    });
-    console.log('Test token created successfully:', testToken);
-    res.json({ success: true, token: testToken });
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Pluggy API error response:', data);
+      return res.status(response.status).json({
+        error: 'Pluggy API test failed',
+        message: data.message || 'Unknown error',
+        status: response.status
+      });
+    }
+
+    console.log('Test token created successfully');
+    res.json({ success: true, token: data.accessToken });
   } catch (error) {
-    console.error('Pluggy test error:', {
-      message: error.message,
-      code: error.code,
-      statusCode: error.statusCode,
-      response: error.response?.data || error.response,
-      stack: error.stack
-    });
+    console.error('Pluggy test error:', error.message);
     res.status(500).json({
-      error: 'Pluggy SDK test failed',
-      message: error.message,
-      code: error.code,
-      statusCode: error.statusCode,
-      fullError: error.toString()
+      error: 'Pluggy API test failed',
+      message: error.message
     });
   }
 });
@@ -755,7 +766,10 @@ app.get('/api/pluggy/test', async (req, res) => {
 // POST /api/pluggy/connect-token — Generate a short-lived widget token
 // Frontend calls this to get a connectToken for the Pluggy widget
 app.post('/api/pluggy/connect-token', async (req, res) => {
-  if (!pluggyClient) {
+  const clientId = process.env.PLUGGY_CLIENT_ID;
+  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
     return res.status(503).json({
       error: 'Pluggy not configured. Set PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in environment.'
     });
@@ -763,27 +777,41 @@ app.post('/api/pluggy/connect-token', async (req, res) => {
 
   try {
     const { clientUserId, itemId } = req.body;
-    // clientUserId should be a stable user ID from your app
-    // itemId is optional — if provided, generate a token for reconnecting that Item
+    const userId = clientUserId || 'anonymous-' + Date.now();
 
-    console.log('Creating Pluggy token for user:', clientUserId || 'anonymous');
-    // According to Pluggy docs, createConnectToken expects specific structure
-    const tokenParams = {
-      clientUserId: clientUserId || 'anonymous-' + Date.now()
+    console.log('Creating Pluggy token for user:', userId);
+
+    // Call Pluggy API directly via HTTP (Basic Auth) to bypass SDK issues
+    const body = {
+      clientUserId: userId
     };
-    // Only include itemId if it's provided (for reconnecting to existing account)
     if (itemId) {
-      tokenParams.itemId = itemId;
+      body.itemId = itemId;
     }
-    const tokenResponse = await pluggyClient.createConnectToken(tokenParams);
 
-    console.log('Token created successfully:', tokenResponse);
-    res.json({ connectToken: tokenResponse.accessToken });
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const response = await fetch('https://api.pluggy.ai/connect_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Pluggy API error: ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Token created successfully');
+    res.json({ connectToken: data.accessToken });
   } catch (error) {
-    console.error('Pluggy connect-token error details:', error.message, error.stack);
+    console.error('Pluggy connect-token error:', error.response?.data || error.message);
     res.status(500).json({
       error: 'Failed to generate connect token',
-      details: error.message
+      details: error.response?.data?.message || error.message
     });
   }
 });
