@@ -1108,8 +1108,19 @@ function classifyIsraeliTransaction(description) {
   return 'Other';
 }
 
+// Diagnostic endpoint to check deployed version
+app.get('/api/version', (req, res) => {
+  res.json({
+    timestamp: new Date().toISOString(),
+    israeliScraperAvailable: israeliScraperAvailable,
+    nodeVersion: process.version,
+    env: process.env.NODE_ENV || 'production'
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`MyBudget backend running on port ${PORT}`);
+  console.log(`Israeli scraper available: ${israeliScraperAvailable}`);
 });
