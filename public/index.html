@@ -1520,8 +1520,8 @@ async function initPluggyWidget() {
 
     const { connectToken } = await response.json();
 
-    // Step 2: Open the Pluggy widget with the token
-    new window.PluggyConnect({
+    // Step 2: Create and open the Pluggy widget with the token
+    const pluggyWidget = new window.PluggyConnect({
       connectToken,
       onSuccess: async (data) => {
         console.log('Pluggy connection successful:', data);
@@ -1536,6 +1536,9 @@ async function initPluggyWidget() {
         console.log('Pluggy widget closed');
       }
     });
+
+    // Call show() to actually display the widget modal
+    pluggyWidget.show();
   } catch (err) {
     console.error('initPluggyWidget error:', err);
     alert('Error opening bank connection: ' + err.message);
