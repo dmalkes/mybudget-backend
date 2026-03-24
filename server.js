@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
-const { Pluggy } = require('pluggy-sdk');
+const Pluggy = require('pluggy-sdk');
 
 const path = require('path');
 
