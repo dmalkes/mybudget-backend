@@ -3,9 +3,23 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
 const { PluggyClient } = require('pluggy-sdk');
-const { getIsraeliBanks, scrapeAccount } = require('israeli-bank-scrapers');
 
 const path = require('path');
+
+// Load Israeli bank scraper — gracefully handle if package is unavailable
+let getIsraeliBanks = null;
+let scrapeAccount = null;
+let israeliScraperAvailable = false;
+try {
+  const scrapers = require('israeli-bank-scrapers');
+  getIsraeliBanks = scrapers.getIsraeliBanks;
+  scrapeAccount = scrapers.scrapeAccount;
+  israeliScraperAvailable = true;
+  console.log('Israeli bank scraper loaded successfully');
+} catch (err) {
+  console.warn('Israeli bank scraper not available:', err.message);
+  console.warn('Israeli bank endpoints will return 503 Service Unavailable');
+}
 
 const app = express();
 
@@ -926,6 +940,10 @@ app.delete('/api/pluggy/disconnect/:itemId', async (req, res) => {
 
 // GET /api/israel/banks — List available Israeli banks
 app.get('/api/israel/banks', async (req, res) => {
+  if (!israeliScraperAvailable) {
+    return res.status(503).json({ error: 'Israeli bank scraper service unavailable' });
+  }
+
   try {
     const banks = await getIsraeliBanks();
 
@@ -946,6 +964,10 @@ app.get('/api/israel/banks', async (req, res) => {
 // POST /api/israel/login — Scrape transactions from Israeli bank
 // Body: { bankId, username, password }
 app.post('/api/israel/login', async (req, res) => {
+  if (!israeliScraperAvailable) {
+    return res.status(503).json({ error: 'Israeli bank scraper service unavailable' });
+  }
+
   try {
     const { bankId, username, password } = req.body;
 
