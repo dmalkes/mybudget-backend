@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
-const Pluggy = require('pluggy-sdk');
+const { PluggyClient } = require('pluggy-sdk');
 
 const path = require('path');
 
@@ -11,7 +11,7 @@ const app = express();
 // Pluggy client — uses CLIENT_ID + CLIENT_SECRET from env
 // In production, ensure these are set in Vercel environment variables
 const pluggyClient = process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET
-  ? new Pluggy({
+  ? new PluggyClient({
       clientId: process.env.PLUGGY_CLIENT_ID,
       clientSecret: process.env.PLUGGY_CLIENT_SECRET,
     })
@@ -759,24 +759,25 @@ app.get('/api/pluggy/sync/:itemId', async (req, res) => {
     // fromDate, toDate: optional ISO 8601 strings for filtering (default: last 90 days)
 
     // Get all accounts linked to this Item
-    const accounts = await pluggyClient.getAccounts({ itemId });
+    const accountsList = await pluggyClient.fetchAccounts(itemId);
 
-    if (!accounts.results?.length) {
+    if (!accountsList?.length) {
       return res.json({ transactions: [], accounts: [] });
     }
 
     // Fetch transactions from all accounts
     const allTransactions = [];
-    for (const account of accounts.results) {
+    for (const account of accountsList) {
       try {
-        const txns = await pluggyClient.getTransactions({
+        const txns = await pluggyClient.fetchTransactions(itemId, {
           accountId: account.id,
-          from: fromDate ? new Date(fromDate) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-          to: toDate ? new Date(toDate) : new Date(),
+          from: fromDate || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+          to: toDate || new Date().toISOString(),
         });
 
         // Normalize Pluggy transaction format to our internal format
-        const normalized = txns.results.map(t => ({
+        const txnsList = Array.isArray(txns) ? txns : (txns.results || []);
+        const normalized = txnsList.map(t => ({
           date: t.date.split('T')[0], // ISO YYYY-MM-DD
           description: t.description,
           originalDescription: t.descriptionRaw,
@@ -795,7 +796,7 @@ app.get('/api/pluggy/sync/:itemId', async (req, res) => {
       }
     }
 
-    res.json({ transactions: allTransactions, accounts: accounts.results });
+    res.json({ transactions: allTransactions, accounts: accountsList });
   } catch (error) {
     console.error('Pluggy sync error:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });
