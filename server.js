@@ -705,6 +705,95 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// Belvo Open Finance Integration (Brazil)
+// ────────────────────────────────────────────────────────────────────────────
+
+const BELVO_SECRET_ID = process.env.BELVO_SECRET_ID;
+const BELVO_SECRET_PASSWORD = process.env.BELVO_SECRET_PASSWORD;
+const BELVO_ENV = process.env.BELVO_ENV || 'sandbox'; // 'sandbox' or 'production'
+const BELVO_BASE_URL = BELVO_ENV === 'production' ? 'https://api.belvo.com' : 'https://sandbox.belvo.com';
+
+function belvoAuthHeader() {
+  const encoded = Buffer.from(`${BELVO_SECRET_ID}:${BELVO_SECRET_PASSWORD}`).toString('base64');
+  return `Basic ${encoded}`;
+}
+
+// POST /api/belvo/widget-token — Generate a short-lived widget access token
+// Frontend uses this token to initialize the Belvo Connect Widget
+app.post('/api/belvo/widget-token', async (req, res) => {
+  if (!BELVO_SECRET_ID || !BELVO_SECRET_PASSWORD) {
+    return res.status(503).json({ error: 'Belvo not configured. Set BELVO_SECRET_ID and BELVO_SECRET_PASSWORD.' });
+  }
+  try {
+    const response = await fetch(`${BELVO_BASE_URL}/api/token/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': belvoAuthHeader()
+      },
+      body: JSON.stringify({
+        id: BELVO_SECRET_ID,
+        password: BELVO_SECRET_PASSWORD,
+        scopes: 'read_institutions,write_links,read_consents,write_consents,write_consent_callback,delete_consents',
+        fetch_resources: ['ACCOUNTS', 'TRANSACTIONS', 'OWNERS'],
+        credentials_storage: 'store',
+        stale_in: '300d'
+      })
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Belvo token error: ${response.status} - ${err}`);
+    }
+    const data = await response.json();
+    res.json({ access: data.access, refresh: data.refresh });
+  } catch (error) {
+    console.error('Belvo widget-token error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/belvo/sync/:linkId — Fetch transactions for a connected account
+app.get('/api/belvo/sync/:linkId', async (req, res) => {
+  if (!BELVO_SECRET_ID || !BELVO_SECRET_PASSWORD) {
+    return res.status(503).json({ error: 'Belvo not configured' });
+  }
+  try {
+    const { linkId } = req.params;
+
+    // Fetch accounts
+    const accountsResp = await fetch(`${BELVO_BASE_URL}/api/accounts/?link=${linkId}`, {
+      headers: { 'Authorization': belvoAuthHeader() }
+    });
+    const accountsData = await accountsResp.json();
+    const accounts = accountsData.results || accountsData || [];
+
+    // Fetch transactions (last 90 days)
+    const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const txResp = await fetch(`${BELVO_BASE_URL}/api/transactions/?link=${linkId}&date_from=${dateFrom}&page_size=1000`, {
+      headers: { 'Authorization': belvoAuthHeader() }
+    });
+    const txData = await txResp.json();
+    const rawTxns = txData.results || txData || [];
+
+    // Normalize to app format
+    const transactions = rawTxns.map(t => ({
+      date: t.value_date || t.accounting_date || t.created_at?.split('T')[0],
+      description: t.description || t.merchant?.name || 'Unknown',
+      amount: t.type === 'OUTFLOW' ? -Math.abs(t.amount) : Math.abs(t.amount),
+      category: t.category || 'Other',
+      source: 'belvo',
+      accountId: t.account?.id,
+      accountName: accounts.find(a => a.id === t.account?.id)?.name || ''
+    }));
+
+    res.json({ transactions, accounts, count: transactions.length });
+  } catch (error) {
+    console.error('Belvo sync error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // Israeli Bank Scraper Integration
 // ────────────────────────────────────────────────────────────────────────────
 

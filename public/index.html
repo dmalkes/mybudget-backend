@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+  <script src="https://cdn.belvo.io/belvo-widget-1-stable.js" async></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
@@ -280,10 +281,15 @@
     <div id="bankSection" class="mt-6 pt-6 border-t border-slate-200">
       <p class="text-xs font-semibold text-slate-600 text-center mb-3" style="text-transform:uppercase;letter-spacing:0.05em">OR</p>
 
+      <!-- Belvo for Brazil -->
+      <button id="belvoBankBtn" onclick="initBelvoWidget()" class="onboarding-button secondary" style="border-color:#6366f1;color:#6366f1;width:100%;display:none">🏦 Connect Your Bank (Brazil)</button>
+      <p class="text-xs text-slate-500 text-center mt-2" id="belvoBankNote" style="display:none">Connect via Brazil's Open Finance network — secure & regulated</p>
+
       <!-- Israeli Bank for Israel -->
       <button id="israeliBankBtn" onclick="showIsraeliLoginModal()" class="onboarding-button secondary" style="border-color:#6366f1;color:#6366f1;width:100%;display:none">🏦 Connect Your Bank (Israel)</button>
       <p class="text-xs text-slate-500 text-center mt-2" id="israeliBankNote" style="display:none">Securely connect your Israeli bank account</p>
     </div>
+    <div id="belvo"></div>
 
     <div id="uploadFileList" class="mt-6 space-y-2"></div>
     <button id="uploadProcessBtn" class="hidden onboarding-button primary" onclick="processUploadedFiles()" data-i18n="upload_analyze">Analyze Files</button>
@@ -1537,16 +1543,93 @@ async function processFiles() {
   }
 }
 
-// Show/hide the bank connection button based on country
+// Show/hide bank connection buttons based on country
 function showPluggyButton() {
+  const belvoBtn = document.getElementById('belvoBankBtn');
+  const belvoNote = document.getElementById('belvoBankNote');
   const israeliBtn = document.getElementById('israeliBankBtn');
   const israeliNote = document.getElementById('israeliBankNote');
-  if (state.onboarding.country === 'Israel') {
-    israeliBtn.style.display = 'block';
-    israeliNote.style.display = 'block';
-  } else {
-    israeliBtn.style.display = 'none';
-    israeliNote.style.display = 'none';
+
+  const isBrazil = state.onboarding.country === 'Brazil';
+  const isIsrael = state.onboarding.country === 'Israel';
+
+  belvoBtn.style.display = isBrazil ? 'block' : 'none';
+  belvoNote.style.display = isBrazil ? 'block' : 'none';
+  israeliBtn.style.display = isIsrael ? 'block' : 'none';
+  israeliNote.style.display = isIsrael ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────
+// BELVO BANK CONNECTION (Brazil)
+// ─────────────────────────────────────
+
+async function initBelvoWidget() {
+  try {
+    // Get widget access token from backend
+    const resp = await fetch('/api/belvo/widget-token', { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json();
+      alert('Could not connect to Belvo: ' + (err.error || 'Unknown error'));
+      return;
+    }
+    const { access } = await resp.json();
+
+    // Wait for Belvo SDK to load
+    if (typeof window.belvoSDK === 'undefined') {
+      alert('Belvo widget is still loading. Please try again in a moment.');
+      return;
+    }
+
+    window.belvoSDK.createWidget(access, {
+      locale: 'pt',
+      country_codes: ['BR'],
+      access_mode: 'recurrent',
+      show_abandon_survey: false,
+      callback: async (link, institution) => {
+        console.log('Belvo link created:', link, institution);
+        await syncBelvoTransactions(link);
+      },
+      onExit: (data) => {
+        console.log('Belvo widget closed', data);
+      },
+      onError: (data) => {
+        console.error('Belvo widget error', data);
+        alert('Bank connection error: ' + (data?.message || JSON.stringify(data)));
+      }
+    }).build();
+  } catch (err) {
+    console.error('initBelvoWidget error:', err);
+    alert('Error launching bank connection: ' + err.message);
+  }
+}
+
+async function syncBelvoTransactions(linkId) {
+  try {
+    showProcessing();
+    const resp = await fetch(`/api/belvo/sync/${linkId}`);
+    if (!resp.ok) throw new Error('Failed to fetch Belvo transactions');
+    const { transactions: belvoTxns, accounts, count } = await resp.json();
+
+    if (!belvoTxns || belvoTxns.length === 0) {
+      hideProcessing();
+      alert('No transactions found yet. Belvo may still be fetching data — try again in a minute.');
+      return;
+    }
+
+    const { added, skipped, income, transfers, expenses } = mergeTransactions(belvoTxns);
+    saveTransactions();
+    hideProcessing();
+
+    // Store linkId for future syncs
+    localStorage.setItem('belvoLinkId', linkId);
+    startApp();
+
+    const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
+    showToast(`✅ Connected ${accounts?.length || 1} account${accounts?.length!==1?'s':''} — Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`, 5000);
+  } catch (err) {
+    console.error('syncBelvoTransactions error:', err);
+    hideProcessing();
+    alert('Error syncing transactions: ' + err.message);
   }
 }
 
