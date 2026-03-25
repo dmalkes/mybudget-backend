@@ -10,7 +10,6 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-  <script src="https://cdn.pluggy.ai/pluggy-connect/v2.8.2/pluggy-connect.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
@@ -280,10 +279,6 @@
     <!-- Bank Connection Section (Brazil/Israel) -->
     <div id="bankSection" class="mt-6 pt-6 border-t border-slate-200">
       <p class="text-xs font-semibold text-slate-600 text-center mb-3" style="text-transform:uppercase;letter-spacing:0.05em">OR</p>
-
-      <!-- Pluggy for Brazil -->
-      <button id="connectBankBtn" onclick="initPluggyWidget()" class="onboarding-button secondary" style="border-color:#6366f1;color:#6366f1;width:100%;display:none">🏦 Connect Your Bank (Brazil)</button>
-      <p class="text-xs text-slate-500 text-center mt-2" id="pluggyNote" style="display:none">Securely connect your bank account for automatic transaction sync</p>
 
       <!-- Israeli Bank for Israel -->
       <button id="israeliBankBtn" onclick="showIsraeliLoginModal()" class="onboarding-button secondary" style="border-color:#6366f1;color:#6366f1;width:100%;display:none">🏦 Connect Your Bank (Israel)</button>
@@ -1542,130 +1537,14 @@ async function processFiles() {
   }
 }
 
-// ─────────────────────────────────────
-// Pluggy Bank Connection Integration
-// ─────────────────────────────────────
-
-// Initialize Pluggy widget (connect bank account for Brazil)
-async function initPluggyWidget() {
-  try {
-    // Step 1: Get a connectToken from the backend
-    const response = await fetch('/api/pluggy/connect-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientUserId: 'user-' + Date.now() })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      console.error('Failed to get connect token:', err);
-      alert('Unable to connect to Pluggy. Please try uploading a file instead.');
-      return;
-    }
-
-    const { connectToken } = await response.json();
-
-    // Step 2: Create and open the Pluggy widget with the token
-    const pluggyWidget = new window.PluggyConnect({
-      connectToken,
-      onSuccess: async (data) => {
-        console.log('Pluggy connection successful:', data);
-        // data.item contains { id: itemId, connectorId, status, error, ... }
-        await syncPluggyTransactions(data.item.id);
-      },
-      onError: (error) => {
-        console.error('Pluggy widget error:', error);
-        alert('Bank connection failed: ' + error.message);
-      },
-      onClose: () => {
-        console.log('Pluggy widget closed');
-      }
-    });
-
-    // Initialize and show the widget modal
-    await pluggyWidget.init();
-    await pluggyWidget.show();
-  } catch (err) {
-    console.error('initPluggyWidget error:', err);
-    alert('Error opening bank connection: ' + err.message);
-  }
-}
-
-// Fetch transactions from Pluggy and merge into app state
-async function syncPluggyTransactions(itemId) {
-  try {
-    showProcessing();
-
-    // Fetch transactions from the connected bank account
-    const response = await fetch(`/api/pluggy/sync/${itemId}`);
-    if (!response.ok) throw new Error('Failed to fetch transactions');
-
-    const { transactions: pluggyTxns, accounts } = await response.json();
-
-    if (!pluggyTxns || pluggyTxns.length === 0) {
-      alert('No transactions found for this account. Try uploading a bank statement instead.');
-      hideProcessing();
-      return;
-    }
-
-    // Normalize to our internal format
-    const candidates = pluggyTxns.map(t => ({
-      date: t.date,
-      description: t.description,
-      originalDescription: t.originalDescription,
-      amount: t.amount, // already signed
-      category: t.category || 'Other',
-      orig: t.originalDescription
-    }));
-
-    // Merge with existing transactions
-    const { added, skipped, income, transfers, expenses } = mergeTransactions(candidates);
-    saveTransactions();
-    hideProcessing();
-
-    // Store the itemId for future syncs
-    state.pluggyItemId = itemId;
-    state.pluggyAccounts = accounts;
-    localStorage.setItem('pluggyItemId', itemId);
-    localStorage.setItem('pluggyAccounts', JSON.stringify(accounts));
-
-    // Start the app
-    startApp();
-
-    // Show success message
-    const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
-    const msg = `✅ Connected ${accounts?.length || 1} account${accounts?.length!==1?'s':''} — Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`;
-    showToast(msg, 5000);
-  } catch (err) {
-    console.error('syncPluggyTransactions error:', err);
-    hideProcessing();
-    alert('Error syncing transactions: ' + err.message);
-  }
-}
-
-// Show/hide the bank connection buttons based on country
+// Show/hide the bank connection button based on country
 function showPluggyButton() {
-  const pluggyBtn = document.getElementById('connectBankBtn');
-  const pluggyNote = document.getElementById('pluggyNote');
   const israeliBtn = document.getElementById('israeliBankBtn');
   const israeliNote = document.getElementById('israeliBankNote');
-
-  if (state.onboarding.country === 'Brazil') {
-    // Show Pluggy for Brazil users
-    pluggyBtn.style.display = 'block';
-    pluggyNote.style.display = 'block';
-    israeliBtn.style.display = 'none';
-    israeliNote.style.display = 'none';
-  } else if (state.onboarding.country === 'Israel') {
-    // Show Israeli bank login for Israel users
-    pluggyBtn.style.display = 'none';
-    pluggyNote.style.display = 'none';
+  if (state.onboarding.country === 'Israel') {
     israeliBtn.style.display = 'block';
     israeliNote.style.display = 'block';
   } else {
-    // Hide both for other countries
-    pluggyBtn.style.display = 'none';
-    pluggyNote.style.display = 'none';
     israeliBtn.style.display = 'none';
     israeliNote.style.display = 'none';
   }
