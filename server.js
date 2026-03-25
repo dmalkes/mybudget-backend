@@ -957,26 +957,26 @@ app.get('/api/israel/banks', async (req, res) => {
 });
 
 // POST /api/israel/login — Scrape transactions from Israeli bank (proxy to scraper service)
-// Body: { bankId, username, password }
-// Timeout: 90 seconds (scraping can take 30-60 seconds)
+// Body: { bankId, credentials: { username, password, ... } }
+// Timeout: 120 seconds (scraping can take 60-90 seconds)
 app.post('/api/israel/login', async (req, res) => {
   try {
-    const { bankId, username, password } = req.body;
+    const { bankId, credentials } = req.body;
 
-    if (!bankId || !username || !password) {
-      return res.status(400).json({ error: 'Missing required fields: bankId, username, password' });
+    if (!bankId || !credentials) {
+      return res.status(400).json({ error: 'Missing required fields: bankId, credentials' });
     }
 
     console.log(`[${new Date().toISOString()}] Proxying scrape request for bank: ${bankId}`);
 
     // Call remote scraper service with timeout
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+    const timeout = setTimeout(() => controller.abort(), 120000); // 120 second timeout
 
     const response = await fetch(`${SCRAPER_SERVICE_URL}/scrape`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bankId, username, password }),
+      body: JSON.stringify({ bankId, credentials }),
       signal: controller.signal
     });
 

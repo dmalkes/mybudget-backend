@@ -391,17 +391,8 @@
         <option value="">Loading banks...</option>
       </select>
 
-      <!-- Username & Password -->
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Username / ID</label>
-          <input type="text" id="israeliBankUsername" placeholder="Your bank username" class="inp">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Password</label>
-          <input type="password" id="israeliBankPassword" placeholder="Your bank password" class="inp">
-        </div>
-      </div>
+      <!-- Dynamic credential fields rendered per bank -->
+      <div id="israeliBankFields" class="space-y-3"></div>
 
       <p class="text-xs text-slate-500 text-center mt-3 mb-4">🔒 Your credentials are only used to connect your bank and are never stored.</p>
 
@@ -1685,6 +1676,16 @@ function showPluggyButton() {
 // ─────────────────────────────────────
 
 // Show the Israeli bank login modal and load available banks
+// Store banks with loginFields for dynamic rendering
+let israeliBanksData = [];
+
+const FIELD_LABELS = {
+  username: 'Username', userCode: 'User Code', id: 'ID Number',
+  password: 'Password', num: 'Account Number', card6Digits: 'Last 6 Digits of Card',
+  nationalID: 'National ID', email: 'Email', phoneNumber: 'Phone Number',
+  otpLongTermToken: 'OTP Long Term Token'
+};
+
 async function showIsraeliLoginModal() {
   const modal = document.getElementById('israeliBankModal');
   const bankSelect = document.getElementById('israeliBankSelect');
@@ -1696,13 +1697,11 @@ async function showIsraeliLoginModal() {
   selectState.style.display = 'none';
 
   try {
-    // Fetch available Israeli banks from the backend
     const response = await fetch('/api/israel/banks');
     if (!response.ok) throw new Error('Failed to fetch banks');
-
     const { banks } = await response.json();
+    israeliBanksData = banks;
 
-    // Populate the bank dropdown
     bankSelect.innerHTML = '<option value="">Select a bank...</option>';
     for (const bank of banks) {
       const option = document.createElement('option');
@@ -1727,15 +1726,30 @@ function closeIsraeliLoginModal() {
 
 // Reset modal to initial state
 function resetIsraeliLoginModal() {
-  document.getElementById('israeliBankUsername').value = '';
-  document.getElementById('israeliBankPassword').value = '';
+  document.getElementById('israeliBankFields').innerHTML = '';
   document.getElementById('israeliBankSelectState').style.display = 'block';
   document.getElementById('israeliBankErrorState').style.display = 'none';
 }
 
-// Update selected bank display
+// Render dynamic fields when bank is selected
 function updateIsraeliSelectedBank() {
-  // Could add visual feedback here if needed
+  const bankId = document.getElementById('israeliBankSelect').value;
+  const bank = israeliBanksData.find(b => b.id === bankId);
+  const fieldsDiv = document.getElementById('israeliBankFields');
+  fieldsDiv.innerHTML = '';
+  if (!bank) return;
+
+  // Filter out OTP callback (not supported in web UI)
+  const fields = bank.loginFields.filter(f => f !== 'otpCodeRetriever');
+  for (const field of fields) {
+    const label = FIELD_LABELS[field] || field;
+    const isPassword = field === 'password';
+    fieldsDiv.innerHTML += `
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">${label}</label>
+        <input type="${isPassword ? 'password' : 'text'}" id="israeliField_${field}" placeholder="${label}" class="inp">
+      </div>`;
+  }
 }
 
 // Show error in the modal
@@ -1748,33 +1762,26 @@ function showIsraeliLoginError(message) {
 // Submit Israeli bank login
 async function submitIsraeliLogin() {
   const bankId = document.getElementById('israeliBankSelect').value;
-  const username = document.getElementById('israeliBankUsername').value.trim();
-  const password = document.getElementById('israeliBankPassword').value;
+  if (!bankId) { showIsraeliLoginError('Please select a bank'); return; }
 
-  if (!bankId) {
-    showIsraeliLoginError('Please select a bank');
-    return;
-  }
-
-  if (!username || !password) {
-    showIsraeliLoginError('Please enter your username and password');
-    return;
+  const bank = israeliBanksData.find(b => b.id === bankId);
+  const fields = bank.loginFields.filter(f => f !== 'otpCodeRetriever');
+  const credentials = {};
+  for (const field of fields) {
+    const val = document.getElementById(`israeliField_${field}`)?.value?.trim();
+    if (!val) { showIsraeliLoginError(`Please enter your ${FIELD_LABELS[field] || field}`); return; }
+    credentials[field] = val;
   }
 
   const submitBtn = document.getElementById('israeliBankSubmitBtn');
   submitBtn.disabled = true;
-  submitBtn.textContent = '⏳ Connecting...';
+  submitBtn.textContent = '⏳ Connecting... (1-2 min)';
 
   try {
-    // Send login credentials to backend
     const response = await fetch('/api/israel/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        bankId,
-        username,
-        password
-      })
+      body: JSON.stringify({ bankId, credentials })
     });
 
     if (!response.ok) {
