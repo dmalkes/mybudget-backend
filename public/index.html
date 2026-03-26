@@ -466,17 +466,35 @@
           <p id="heroTotal" class="text-4xl font-extrabold mb-0.5">R$0</p>
         </div>
         <div id="heroIncomeBox" class="text-right hidden">
-          <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_label">Income</p>
-          <p id="heroIncome" class="text-xl font-bold text-emerald-300">R$0</p>
-          <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mt-2 mb-0.5" data-i18n="balance_label">Balance</p>
-          <p id="heroBalance" class="text-xl font-bold">R$0</p>
+          <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-1" data-i18n="income_label">Income</p>
+          <p id="heroIncome" class="text-4xl font-extrabold text-emerald-300 mb-1.5">R$0</p>
+          <div class="flex justify-end gap-4">
+            <div>
+              <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_fixed">Fixed</p>
+              <p id="heroIncomeFixed" class="text-sm font-semibold text-emerald-200/80">R$0</p>
+            </div>
+            <div>
+              <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_variable">Variable</p>
+              <p id="heroIncomeVariable" class="text-sm font-semibold text-emerald-200/80">R$0</p>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="flex items-center justify-between mt-3">
-        <div class="flex items-center gap-3">
-          <span id="heroNet" class="text-white/80 text-sm"></span>
-          <span id="heroCount" class="text-white/60 text-xs"></span>
+      <!-- Balance strip — shown when income data present -->
+      <div id="heroBalanceRow" class="hidden mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
+        <div>
+          <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="balance_label">Balance</p>
+          <p id="heroBalance" class="text-xl font-bold">R$0</p>
         </div>
+        <span id="heroCount" class="text-white/50 text-xs"></span>
+        <div class="flex items-center gap-2">
+          <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
+          <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
+        </div>
+      </div>
+      <!-- Bottom row — when no income recorded -->
+      <div id="heroNoIncomeRow" class="flex items-center justify-between mt-3">
+        <span id="heroCountNoIncome" class="text-white/60 text-xs"></span>
         <div class="flex items-center gap-2">
           <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
           <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
@@ -779,6 +797,7 @@ const STRINGS = {
     months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     chart_spending: 'Spending', chart_income: 'Income',
     spent_this_month: 'Spent this month', income_label: 'Income',
+    income_fixed: 'Fixed', income_variable: 'Variable',
     balance_label: 'Balance', hero_net_prefix: 'Net:', hero_txns: 'transactions',
     anomaly_title: '⚠ Spending Alerts', anomaly_avg: 'avg',
     fv_title: 'Fixed vs Variable', fv_details: 'Details →',
@@ -840,6 +859,7 @@ const STRINGS = {
     months: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
     chart_spending: 'Gastos', chart_income: 'Renda',
     spent_this_month: 'Gasto este mês', income_label: 'Renda',
+    income_fixed: 'Fixo', income_variable: 'Variável',
     balance_label: 'Saldo', hero_net_prefix: 'Líquido:', hero_txns: 'transações',
     anomaly_title: '⚠ Alertas de Gastos', anomaly_avg: 'média',
     fv_title: 'Fixo vs Variável', fv_details: 'Detalhes →',
@@ -901,6 +921,7 @@ const STRINGS = {
     months: ['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצ'],
     chart_spending: 'הוצאות', chart_income: 'הכנסות',
     spent_this_month: 'הוצאות החודש', income_label: 'הכנסות',
+    income_fixed: 'קבוע', income_variable: 'משתנה',
     balance_label: 'מאזן', hero_net_prefix: 'נטו:', hero_txns: 'תנועות',
     anomaly_title: '⚠ התראות הוצאות', anomaly_avg: 'ממוצע',
     fv_title: 'קבוע מול משתנה', fv_details: 'פרטים ←',
@@ -1850,6 +1871,10 @@ function guessBrCategory(desc, amount) {
   if (/pix\s*(enviad|para\b)|ted\b|doc\b|transfer[eê]ncia|transf\b/i.test(d)) return 'Transfers';
   if (/saque|caixa\s*eletr/i.test(d)) return 'Cash & ATM';
   if (/tarifa|anuidade|\biof\b|juros\s*rot|multa|mora\b|\bcet\b/i.test(d)) return 'Banking Fees';
+  if (/rentab\.?\s*invest|facil\s*cred|poupan[cç]/i.test(d)) return 'Income'; // Bradesco savings yield
+  if (/gastos\s*cart[aã]o|fatura\s*cart[aã]o/i.test(d)) return 'Transfers'; // CC bill payment
+  if (/pagto\s*eletron|pag\s*elet|cobran[cç]a/i.test(d)) return 'Utilities'; // bill payments
+  if (/tv\s*por\s*assinatura|net\s*combo/i.test(d)) return 'Subscriptions & Software'; // pay TV
   if (/ifood|rappi|uber\s*eats|james\s*deliv|zee\s*deliv/i.test(d)) return 'Food & Dining';
   if (/mcdonald|burger\s*king|subway|bob\'?s\b|giraffas|habib|outback/i.test(d)) return 'Food & Dining';
   if (/\buber\b|99\s*(t[aá]xi|mob)|cabify|indriver/i.test(d)) return 'Transportation';
@@ -1967,6 +1992,61 @@ function parseBradescoCC(text) {
     const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
     txns.push({ date, description: m[2].trim(), amount: finalAmt,
       category: isCredit ? 'Transfers' : guessBrCategory(m[2], finalAmt), source: 'Bradesco' });
+  }
+  return txns.length ? txns : null;
+}
+
+// Bradesco checking account — two-column Crédito/Débito format
+// Uses running balance to determine sign: prevBalance + amt = newBalance → credit, else debit
+function parseBradescoAccount(text) {
+  if (!/(bradesco)/i.test(text)) return null;
+  // Must look like a checking account (not a CC statement)
+  if (/lan[çc]amentos|vencimento/i.test(text)) return null;
+
+  // Extract statement year from period header e.g. "Movimentação entre: 01/12/2025 e 01/03/2026"
+  const periodM = text.match(/entre[:\s]+\d{2}\/\d{2}\/(\d{4})/i);
+  const defaultYear = periodM ? periodM[1] : new Date().getFullYear().toString();
+
+  const txns = [];
+  let prevBalance = null;
+
+  for (const line of text.split('\n')) {
+    // Skip detail sub-lines (start with "DES:" or "Endereço:" etc.)
+    if (/^\s*(DES:|Endere[çc]o:|Empresa:|Agencia:|CPF:|CNPJ:)/i.test(line)) continue;
+
+    // Transaction line: DD/MM/YYYY  DESCRIPTION  [code]  AMT  BALANCE
+    // Two decimal amounts at end — first is transaction, second is running balance
+    const m = line.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(.+?)\s{2,}([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
+    if (!m) {
+      // Try simpler pattern without year (some rows omit it)
+      const m2 = line.match(/^(\d{2})\/(\d{2})\s+(.+?)\s{2,}([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
+      if (!m2) continue;
+      const [, dd, mm, desc, amtStr, balStr] = m2;
+      const amt = brAmount(amtStr); const bal = brAmount(balStr);
+      if (amt === null || bal === null) continue;
+      const year = defaultYear;
+      const date = `${year}-${mm}-${dd}`;
+      const isCredit = prevBalance !== null ? Math.abs(prevBalance + amt - bal) < 0.02 : false;
+      const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
+      prevBalance = bal;
+      const cat = guessBrCategory(desc, finalAmt);
+      const _isIncome = cat === 'Income';
+      const _isTransfer = cat === 'Transfers';
+      txns.push({ date, description: desc.trim(), amount: finalAmt, category: cat, source: 'Bradesco', _isIncome, _isTransfer });
+      continue;
+    }
+    const [, dd, mm, yyyy, desc, amtStr, balStr] = m;
+    const amt = brAmount(amtStr); const bal = brAmount(balStr);
+    if (amt === null || bal === null) continue;
+    const date = `${yyyy}-${mm}-${dd}`;
+    // Determine credit vs debit by comparing with running balance
+    const isCredit = prevBalance !== null ? Math.abs(prevBalance + amt - bal) < 0.02 : false;
+    const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
+    prevBalance = bal;
+    const cat = guessBrCategory(desc, finalAmt);
+    const _isIncome = cat === 'Income';
+    const _isTransfer = cat === 'Transfers';
+    txns.push({ date, description: desc.trim(), amount: finalAmt, category: cat, source: 'Bradesco', _isIncome, _isTransfer });
   }
   return txns.length ? txns : null;
 }
@@ -2183,6 +2263,8 @@ function tryBrazilianBankParser(text) {
       return parseNubankCC(text);
     if (t.includes('bradesco') && t.includes('lançamentos'))
       return parseBradescoCC(text);
+    if (t.includes('bradesco') && (t.includes('movimentação') || t.includes('extrato') || t.includes('saldo')))
+      return parseBradescoAccount(text);
     if ((t.includes('itaú') || t.includes('itau')) && t.includes('extrato conta'))
       return parseItauAccount(text);
     if ((t.includes('itaú') || t.includes('itaucard')) && t.includes('compras e saques'))
@@ -2495,21 +2577,38 @@ function renderDashboard() {
   const thisMonthIncome = credits.filter(t => budgetMonth(t) === thisMonth);
 
   const totalSpent = thisMonthTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
-  const totalIncome = thisMonthIncome.reduce((s, t) => s + Math.abs(t.amount), 0);
+
+  // Income breakdown: fixed = salary/regular, variable = other income + incoming PIX/TED (Transfers with positive amount)
+  const salaryCats = thisMonthIncome.filter(tx => /sal[aá]rio|folha|salario|payroll/i.test(tx.description));
+  const fixedIncome = salaryCats.reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const otherIncome = thisMonthIncome.filter(tx => !/sal[aá]rio|folha|salario|payroll/i.test(tx.description))
+    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  // Incoming PIX/TED (positive Transfers) count as variable income in the display
+  const incomingTransfers = validTxns.filter(tx =>
+    budgetMonth(tx) === thisMonth && tx._isTransfer && tx.amount > 0
+  ).reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const variableIncome = otherIncome + incomingTransfers;
+  const totalIncome = fixedIncome + variableIncome;
 
   document.getElementById('heroTotal').textContent = fmt(totalSpent);
-  document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
 
   if (totalIncome > 0) {
     document.getElementById('heroIncomeBox').classList.remove('hidden');
     document.getElementById('heroIncome').textContent = fmt(totalIncome);
+    document.getElementById('heroIncomeFixed').textContent = fmt(fixedIncome);
+    document.getElementById('heroIncomeVariable').textContent = fmt(variableIncome);
     const net = totalIncome - totalSpent;
     const balEl = document.getElementById('heroBalance');
     balEl.textContent = (net >= 0 ? '+' : '-') + fmt(Math.abs(net));
     balEl.style.color = net >= 0 ? '#6ee7b7' : '#fca5a5';
-    document.getElementById('heroNet').textContent = '';
+    document.getElementById('heroBalanceRow').classList.remove('hidden');
+    document.getElementById('heroNoIncomeRow').classList.add('hidden');
+    document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
   } else {
-    document.getElementById('heroNet').textContent = '';
+    document.getElementById('heroIncomeBox').classList.add('hidden');
+    document.getElementById('heroBalanceRow').classList.add('hidden');
+    document.getElementById('heroNoIncomeRow').classList.remove('hidden');
+    document.getElementById('heroCountNoIncome').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
   }
   renderAnomalyAlerts();
 

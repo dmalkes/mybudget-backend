@@ -608,7 +608,19 @@ app.post('/api/parse-file', parseLimiter, async (req, res) => {
     - Uber Inter-Cities, BlaBlaCar = Travel (intercity)
     - Escola, Faculdade, Universidade, Anhanguera, Kroton, Estácio, FGTS Ed = Education
     - PagSeguro, Mercado Pago, PicPay, Ame Digital = Transfers (digital wallet, classify by context if possible)
-    - Boleto, DARF, IPTU, IPVA, DPVAT, Guia = Banking Fees or Utilities depending on type` : '';
+    - Boleto, DARF, IPTU, IPVA, DPVAT, Guia = Banking Fees or Utilities depending on type
+- Bradesco checking account (extrato de conta corrente) format:
+  * Two-column amount format: Crédito column (money IN) and Débito column (money OUT)
+  * Each transaction line: DD/MM/YYYY  DESCRIPTION  AMOUNT  RUNNING_BALANCE
+  * Use the running balance to confirm sign: prevBalance + txnAmt = newBalance → credit; prevBalance - txnAmt = newBalance → debit
+  * RENTAB.INVEST FACILCRED* = savings yield → Income (positive)
+  * GASTOS CARTAO DE CREDITO = credit card bill payment → Transfers (negative)
+  * PAGTO ELETRON COBRANCA = electronic bill payment → Utilities (negative)
+  * TV POR ASSINATURA = pay TV subscription → Subscriptions & Software (negative)
+  * TRANSFERENCIA PIX (incoming) = Income or Transfers depending on context (positive)
+  * TRANSFERENCIA PIX (outgoing) = Transfers (negative)
+  * PIX QR CODE DINAMICO = PIX payment (usually expense, negative)
+  * CLARO SA-RESIDENCIAL = telecom/internet → Utilities (negative)` : '';
 
     const netherlandsGuide = isNetherlands ? `
 - Dutch bank statement specifics:
