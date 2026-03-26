@@ -1784,7 +1784,6 @@ function preprocessBankText(rawText) {
 }
 
 // ─────────────────────────────────────
-// ─────────────────────────────────────
 // BRAZILIAN BANK PARSERS (deterministic, no AI needed)
 // ─────────────────────────────────────
 
@@ -1792,8 +1791,57 @@ function brAmount(str) {
   if (!str) return null;
   const s = str.replace(/\s/g, '');
   const neg = s.startsWith('-') || s.endsWith('-');
+  // Strip currency symbol and thousands separators; replace comma decimal
   const n = parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.'));
   return isNaN(n) ? null : (neg ? -n : n);
+}
+
+// Parse a single CSV line respecting double-quoted fields
+function parseCSVLine(line, sep = ',') {
+  const fields = [];
+  let inQuote = false, cur = '';
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQuote = !inQuote; continue; }
+    if (c === sep && !inQuote) { fields.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  fields.push(cur);
+  return fields.map(f => f.trim());
+}
+
+// Infer transaction category from description + sign for Brazilian banks
+function guessBrCategory(desc, amount) {
+  const d = (desc || '').toLowerCase();
+  if (/pagamento\s*(fatura|cart[aã]o)|pgto\s*fatura|pag\s*fatura/i.test(d)) return 'Transfers';
+  if (amount > 0) {
+    if (/sal[aá]rio|folha\s*pgto|pagto.*sal/i.test(d)) return 'Income';
+    if (/rendimento|juros\s*(cr[eé]d|poup)|dividendo|\bcdb\b|lci|lca/i.test(d)) return 'Income';
+    if (/estorno|reembolso|devolu[cç]/i.test(d)) return 'Refunds & Credits';
+    if (/pix|ted\b|doc\b|transfer[eê]ncia/i.test(d)) return 'Transfers';
+    return 'Income';
+  }
+  if (/pix\s*(enviad|para\b)|ted\b|doc\b|transfer[eê]ncia|transf\b/i.test(d)) return 'Transfers';
+  if (/saque|caixa\s*eletr/i.test(d)) return 'Cash & ATM';
+  if (/tarifa|anuidade|\biof\b|juros\s*rot|multa|mora\b|\bcet\b/i.test(d)) return 'Banking Fees';
+  if (/ifood|rappi|uber\s*eats|james\s*deliv|zee\s*deliv/i.test(d)) return 'Food & Dining';
+  if (/mcdonald|burger\s*king|subway|bob\'?s\b|giraffas|habib|outback/i.test(d)) return 'Food & Dining';
+  if (/\buber\b|99\s*(t[aá]xi|mob)|cabify|indriver/i.test(d)) return 'Transportation';
+  if (/ipiranga|shell\b|posto\b|combusti[vv]|gasolina|ra[ií]zen|br\s*rede/i.test(d)) return 'Transportation';
+  if (/metr[ôo]|sptrans|bilhete.*[uú]nico|supervia|cptm|\b[oô]nibus/i.test(d)) return 'Transportation';
+  if (/carrefour|extra\b|assa[ií]|atac[aã]o|p[aã]o\s*de\s*a[cç][uú]|supermercado|hortifruti/i.test(d)) return 'Groceries';
+  if (/mercado\s*livre|shopee|americanas|magazine\s*luiza|amazon|submarino/i.test(d)) return 'Shopping';
+  if (/renner|riachuelo|c&a\b|hering|shein|zara|h&m|casas\s*bahia/i.test(d)) return 'Shopping';
+  if (/netflix|spotify|disney|globoplay|amazon\s*prime|apple\s*one|deezer|youtube\s*premium/i.test(d)) return 'Subscriptions & Software';
+  if (/microsoft|google\s*one|icloud|adobe|canva|notion|chatgpt/i.test(d)) return 'Subscriptions & Software';
+  if (/\bvivo\b|\btim\b|\bclaro\b|\boi\b|net\s*serv/i.test(d)) return 'Utilities';
+  if (/enel\b|cemig|cpfl|sabesp|copel|energisa|\blight\b/i.test(d)) return 'Utilities';
+  if (/farm[aá]cia|drogaria|droga\s*raia|drogasil|ultrafarma/i.test(d)) return 'Health & Medical';
+  if (/unimed|bradesco\s*sa[uú]de|sulamerica|amil|hapvida/i.test(d)) return 'Insurance';
+  if (/airbnb|booking|decolar|\bcvc\b|latam\b|azul\b|\bgol\b/i.test(d)) return 'Travel';
+  if (/escola|faculdade|universidade|anhanguera|est[aá]cio|kroton/i.test(d)) return 'Education';
+  if (/leroy\s*merlin|telhanorte|tok.*stok/i.test(d)) return 'Home & Garden';
+  return 'Other';
 }
 
 function brMonth(abbr) {
@@ -1816,11 +1864,8 @@ function parseOFX(text) {
     const desc = get('MEMO') || get('NAME') || '';
     const type = (get('TRNTYPE') || '').toUpperCase();
     if (!dateStr || isNaN(amt) || !desc) continue;
-    txns.push({
-      date: dateStr, description: desc, amount: amt,
-      category: amt > 0 ? 'Income' : type === 'TRANSFER' ? 'Transfers' : 'Other',
-      source: 'OFX'
-    });
+    const cat = type === 'TRANSFER' ? 'Transfers' : guessBrCategory(desc, amt);
+    txns.push({ date: dateStr, description: desc, amount: amt, category: cat, source: 'OFX' });
   }
   return txns;
 }
@@ -1838,8 +1883,9 @@ function parseNubankCC(text) {
     const date = `${year}-${mon}-${m[1].padStart(2,'0')}`;
     const amt = brAmount(m[4]); if (amt === null) continue;
     const isPagamento = /pagamento/i.test(m[3]);
-    txns.push({ date, description: m[3].trim(), amount: isPagamento ? amt : -amt,
-      category: isPagamento ? 'Transfers' : 'Other', source: 'Nubank' });
+    const finalAmt = isPagamento ? Math.abs(amt) : -Math.abs(amt);
+    txns.push({ date, description: m[3].trim(), amount: finalAmt,
+      category: isPagamento ? 'Transfers' : guessBrCategory(m[3], finalAmt), source: 'Nubank' });
   }
   return txns.length ? txns : null;
 }
@@ -1857,8 +1903,9 @@ function parseBradescoCC(text) {
     const date = `${year}-${mm}-${dd}`;
     const amt = brAmount(m[3]); if (amt === null) continue;
     const isCredit = m[4] === '-' || /pagto|pagamento|cr[eé]dito/i.test(m[2]);
-    txns.push({ date, description: m[2].trim(), amount: isCredit ? amt : -amt,
-      category: isCredit ? 'Transfers' : 'Other', source: 'Bradesco' });
+    const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
+    txns.push({ date, description: m[2].trim(), amount: finalAmt,
+      category: isCredit ? 'Transfers' : guessBrCategory(m[2], finalAmt), source: 'Bradesco' });
   }
   return txns.length ? txns : null;
 }
@@ -1873,7 +1920,7 @@ function parseItauAccount(text) {
     const date = `${yyyy}-${mm}-${dd}`;
     const amt = brAmount(m[3]); if (amt === null) continue;
     txns.push({ date, description: m[2].trim(), amount: amt,
-      category: amt > 0 ? 'Income' : 'Other', source: 'Itaú' });
+      category: guessBrCategory(m[2], amt), source: 'Itaú' });
   }
   return txns.length ? txns : null;
 }
@@ -1895,8 +1942,9 @@ function parseItauCC(text) {
       const [dd, mm] = m[1].split('/');
       const date = `${year}-${mm}-${dd}`;
       const amt = brAmount(m[3].replace(/\s/g,'')); if (amt === null) continue;
-      txns.push({ date, description: m[2].trim(), amount: -Math.abs(amt),
-        category: 'Other', source: 'Itaucard' });
+      const finalAmt = -Math.abs(amt);
+      txns.push({ date, description: m[2].trim(), amount: finalAmt,
+        category: guessBrCategory(m[2], finalAmt), source: 'Itaucard' });
     }
     pat.lastIndex = 0; // reset for next line
   }
@@ -1906,35 +1954,36 @@ function parseItauCC(text) {
 // Nubank CSV: "Data,Categoria,Título,Valor"
 // Amounts: positive = expense (you owe), negative = payment/refund
 function parseNubankCSV(text) {
-  const lines = text.trim().split('\n');
+  const clean = text.replace(/^\uFEFF/, ''); // strip Excel BOM
+  const lines = clean.trim().split('\n');
   const header = lines[0].toLowerCase().replace(/\r/g, '');
   if (!header.includes('título') && !header.includes('titulo')) return null;
   if (!header.includes('valor') || !header.includes('data')) return null;
-  const cols = header.split(',');
-  const iDate = cols.findIndex(c => c.trim() === 'data');
-  const iDesc = cols.findIndex(c => c.trim().includes('t') && c.trim().includes('tulo'));
-  const iAmt  = cols.findIndex(c => c.trim() === 'valor');
-  const iCat  = cols.findIndex(c => c.trim().includes('categoria') || c.trim().includes('category'));
+  const cols = parseCSVLine(header);
+  const iDate = cols.findIndex(c => c === 'data');
+  const iDesc = cols.findIndex(c => c.includes('tulo')); // título
+  const iAmt  = cols.findIndex(c => c === 'valor');
+  const iCat  = cols.findIndex(c => c.includes('categoria') || c.includes('category'));
   if (iDate < 0 || iDesc < 0 || iAmt < 0) return null;
   const txns = [];
   for (const raw of lines.slice(1)) {
-    const parts = raw.replace(/\r/g, '').split(',');
+    const parts = parseCSVLine(raw.replace(/\r/g, ''));
     if (parts.length < 3) continue;
-    const dateStr = parts[iDate]?.trim();
-    const desc    = parts[iDesc]?.trim();
-    const amtRaw  = parts[iAmt]?.trim();
+    const dateStr = parts[iDate];
+    const desc    = parts[iDesc];
+    const amtRaw  = parts[iAmt];
     if (!dateStr || !desc || !amtRaw) continue;
     // Date: YYYY-MM-DD already, or DD/MM/YYYY
     const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr
       : dateStr.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
     const amt = parseFloat(amtRaw.replace(',', '.'));
     if (isNaN(amt)) continue;
-    const catRaw = iCat >= 0 ? (parts[iCat]?.trim() || '') : '';
+    const catRaw = iCat >= 0 ? (parts[iCat] || '') : '';
     const isPagamento = /pagamento|payment/i.test(desc) || amt < 0;
+    const finalAmt = isPagamento ? Math.abs(amt) : -amt;
     txns.push({
-      date, description: desc,
-      amount: isPagamento ? Math.abs(amt) : -amt,
-      category: isPagamento ? 'Transfers' : mapNubankCategory(catRaw),
+      date, description: desc, amount: finalAmt,
+      category: isPagamento ? 'Transfers' : (mapNubankCategory(catRaw) !== 'Other' ? mapNubankCategory(catRaw) : guessBrCategory(desc, finalAmt)),
       source: 'Nubank'
     });
   }
@@ -1958,7 +2007,8 @@ function mapNubankCategory(cat) {
 
 // Inter Bank CSV: "Data;Tipo;Descrição;Valor" (semicolon, already signed)
 function parseInterCSV(text) {
-  const lines = text.trim().split('\n');
+  const clean = text.replace(/^\uFEFF/, ''); // strip Excel BOM
+  const lines = clean.trim().split('\n');
   const header = lines[0].toLowerCase().replace(/\r/g, '');
   if (!header.includes('inter') && !(header.includes('descri') && header.includes('tipo'))) return null;
   // Find the actual header row (Inter sometimes has metadata rows first)
@@ -1979,15 +2029,46 @@ function parseInterCSV(text) {
     const amtRaw  = parts[iAmt]?.trim();
     if (!dateRaw || !desc || !amtRaw) continue;
     const date = dateRaw.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     const amt = brAmount(amtRaw);
     if (amt === null) continue;
     const tipo = iType >= 0 ? (parts[iType]?.trim() || '') : '';
-    const isIncome = amt > 0 || /recebido|receb|crédito|credito|salário|salario/i.test(tipo + desc);
     txns.push({
       date, description: desc, amount: amt,
-      category: isIncome ? 'Income' : /transfer|pix|ted|doc/i.test(tipo) ? 'Transfers' : 'Other',
+      category: guessBrCategory(tipo + ' ' + desc, amt),
       source: 'Inter'
     });
+  }
+  return txns.length ? txns : null;
+}
+
+// Santander Brazil CSV: "Data;Histórico;Valor" (semicolons, signed amounts)
+function parseSantanderCSV(text) {
+  const clean = text.replace(/^\uFEFF/, '');
+  if (!clean.includes(';')) return null;
+  const lines = clean.trim().split('\n');
+  // Find header row with "histórico" or "historico"
+  let headerIdx = lines.findIndex(l => /hist[oó]rico/i.test(l) && /data/i.test(l));
+  if (headerIdx < 0) return null;
+  const cols = lines[headerIdx].toLowerCase().replace(/\r/g, '').split(';');
+  const iDate = cols.findIndex(c => c.trim() === 'data');
+  const iDesc = cols.findIndex(c => c.trim().includes('hist'));
+  const iAmt  = cols.findIndex(c => c.trim() === 'valor');
+  if (iDate < 0 || iDesc < 0 || iAmt < 0) return null;
+  const txns = [];
+  for (const raw of lines.slice(headerIdx + 1)) {
+    const parts = raw.replace(/\r/g, '').split(';');
+    if (parts.length < 3) continue;
+    const dateRaw = parts[iDate]?.trim();
+    const desc    = parts[iDesc]?.trim();
+    const amtRaw  = parts[iAmt]?.trim();
+    if (!dateRaw || !desc || !amtRaw) continue;
+    const date = dateRaw.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const amt = brAmount(amtRaw);
+    if (amt === null) continue;
+    txns.push({ date, description: desc, amount: amt,
+      category: guessBrCategory(desc, amt), source: 'Santander' });
   }
   return txns.length ? txns : null;
 }
@@ -2002,6 +2083,9 @@ function tryBrazilianBankParser(text) {
     }
     if (t.includes('inter') || (t.includes('tipo') && t.includes('descrição') && text.includes(';'))) {
       const r = parseInterCSV(text); if (r) return r;
+    }
+    if (t.includes('histórico') || t.includes('historico')) {
+      const r = parseSantanderCSV(text); if (r) return r;
     }
     // PDF parsers
     if (t.includes('nu pagamentos') || (t.includes('nubank') && t.includes('fatura')))
@@ -2045,7 +2129,7 @@ async function extractCandidates(file) {
     const wb = XLSX.read(ab);
     rawText = wb.SheetNames.map(sh => XLSX.utils.sheet_to_csv(wb.Sheets[sh])).join('\n');
   } else if (name.endsWith('.csv')) {
-    rawText = await file.text();
+    rawText = (await file.text()).replace(/^\uFEFF/, ''); // strip Excel BOM
   } else {
     return [];
   }
