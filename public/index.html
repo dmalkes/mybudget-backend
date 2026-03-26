@@ -1528,9 +1528,19 @@ async function processFiles() {
     hideProcessing();
     renderDashboard();
     const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
-    const msg = `✅ Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`;
-    showToast(msg, 5000);
-    if (errors.length) console.warn('Some files failed:', errors);
+    let msg;
+    if (added === 0 && allCandidates.length === 0) {
+      msg = `⚠ No transactions found. Make sure the file is a supported bank export (PDF, CSV, OFX, XLSX).`;
+    } else if (added === 0 && skipped > 0) {
+      msg = `ℹ All ${skipped} transaction${skipped!==1?'s':''} already imported — no duplicates added.`;
+    } else {
+      msg = `✅ Added ${added} transaction${added!==1?'s':''}${breakdown}${skipped > 0 ? ` (${skipped} duplicate${skipped!==1?'s':''} skipped)` : ''}`;
+    }
+    showToast(msg, 6000);
+    if (errors.length) {
+      console.warn('Some files failed:', errors);
+      showToast(`⚠ ${errors.length} file${errors.length!==1?'s':''} failed to process. Check console for details.`, 6000);
+    }
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -1914,9 +1924,18 @@ function parseNubankCC(text) {
   return txns.length ? txns : null;
 }
 
+// Handle year rollover: e.g. January statement containing December transactions → use prior year
+function resolveYear(baseYear, statementMonth, txnMonth) {
+  const base = parseInt(baseYear), sm = parseInt(statementMonth), tm = parseInt(txnMonth);
+  if (sm <= 2 && tm >= 11) return (base - 1).toString(); // Jan/Feb statement, Nov/Dec txn
+  if (sm >= 11 && tm <= 2) return (base + 1).toString(); // Nov/Dec statement, Jan/Feb txn
+  return baseYear;
+}
+
 function parseBradescoCC(text) {
-  const yearM = text.match(/[Vv]encimento[:\s]+\d{2}\/\d{2}\/(\d{4})/);
-  const year = yearM ? yearM[1] : new Date().getFullYear().toString();
+  const yearM = text.match(/[Vv]encimento[:\s]+\d{2}\/(\d{2})\/(\d{4})/);
+  const stmtMonth = yearM ? yearM[1] : null;
+  const baseYear = yearM ? yearM[2] : new Date().getFullYear().toString();
   const section = text.match(/Lan[çc]amentos[\s\S]+/i);
   if (!section) return null;
   const txns = [];
@@ -1924,6 +1943,7 @@ function parseBradescoCC(text) {
     const m = line.match(/^(\d{2}\/\d{2})\s+(.+?)\s+([\d.]+,\d{2})\s*(-?)\s*$/);
     if (!m) continue;
     const [dd, mm] = m[1].split('/');
+    const year = stmtMonth ? resolveYear(baseYear, stmtMonth, mm) : baseYear;
     const date = `${year}-${mm}-${dd}`;
     const amt = brAmount(m[3]); if (amt === null) continue;
     const isCredit = m[4] === '-' || /pagto|pagamento|cr[eé]dito/i.test(m[2]);
@@ -1970,8 +1990,9 @@ function mapItauPDFCategory(sectionHeader) {
 
 function parseItauCC(text) {
   if (!/(itaucard|lan[çc]amentos.*compras)/i.test(text)) return null;
-  const yearM = text.match(/[Vv]encimento[:\s]*\d{2}\/\d{2}\/(\d{4})/);
-  const year = yearM ? yearM[1] : new Date().getFullYear().toString();
+  const yearM = text.match(/[Vv]encimento[:\s]*\d{2}\/(\d{2})\/(\d{4})/);
+  const stmtMonth = yearM ? yearM[1] : null;
+  const baseYear = yearM ? yearM[2] : new Date().getFullYear().toString();
   // Pattern matches transactions in both single and two-column layouts
   const pat = /(\d{2}\/\d{2})\s+([A-Za-z][^-\d\n]*?)\s+(-\s*[\d.]+,\d{2}|[\d.]+,\d{2})/g;
   // Category section headers: standalone lines with no date/amount, inside the section
@@ -1992,10 +2013,10 @@ function parseItauCC(text) {
     let m;
     while ((m = pat.exec(line)) !== null) {
       const [dd, mm] = m[1].split('/');
+      const year = stmtMonth ? resolveYear(baseYear, stmtMonth, mm) : baseYear;
       const date = `${year}-${mm}-${dd}`;
       const amt = brAmount(m[3].replace(/\s/g,'')); if (amt === null) continue;
       const finalAmt = -Math.abs(amt);
-      // Prefer PDF section category, fall back to keyword detection
       const cat = currentCategory || guessBrCategory(m[2], finalAmt);
       txns.push({ date, description: m[2].trim(), amount: finalAmt, category: cat, source: 'Itaucard' });
     }
@@ -2180,6 +2201,13 @@ async function extractCandidates(file) {
   } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
     const ab = await file.arrayBuffer();
     const wb = XLSX.read(ab);
+    // Try each sheet independently — use first one that a deterministic parser recognises
+    for (const sh of wb.SheetNames) {
+      const csv = XLSX.utils.sheet_to_csv(wb.Sheets[sh]).replace(/^\uFEFF/, '');
+      const r = tryBrazilianBankParser(csv);
+      if (r && r.length > 0) return r;
+    }
+    // No sheet matched a deterministic parser — pass all sheets to Claude
     rawText = wb.SheetNames.map(sh => XLSX.utils.sheet_to_csv(wb.Sheets[sh])).join('\n');
   } else if (name.endsWith('.csv')) {
     rawText = (await file.text()).replace(/^\uFEFF/, ''); // strip Excel BOM
