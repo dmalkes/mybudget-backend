@@ -1421,7 +1421,7 @@ function handleUploadFiles(files) {
     const ext = f.name.split('.').pop().toLowerCase();
     const item = document.createElement('div');
     item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f8fafc;border-radius:8px';
-    item.innerHTML = `<span style="font-size:.85rem;color:#475569"><span style="color:#6366f1;font-weight:600">${f.name}</span> · ${(f.size/1024).toFixed(0)}KB</span>
+    item.innerHTML = `<span style="font-size:.85rem;color:#475569"><span style="color:#6366f1;font-weight:600">${esc(f.name)}</span> · ${(f.size/1024).toFixed(0)}KB</span>
       <button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.1rem" onclick="removeFile(${i})">×</button>`;
     list.appendChild(item);
   });
@@ -1451,7 +1451,7 @@ function handleFiles(fileList, isWelcome) {
     files.forEach((f, i) => {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f8fafc;border-radius:8px';
-      item.innerHTML = `<span style="font-size:.85rem;color:#475569">${f.name}</span>
+      item.innerHTML = `<span style="font-size:.85rem;color:#475569">${esc(f.name)}</span>
         <button style="background:none;border:none;color:#94a3b8;cursor:pointer" onclick="removeFile(${i})">×</button>`;
       list.appendChild(item);
     });
@@ -1494,7 +1494,9 @@ async function processUploadedFiles() {
   showProcessing();
   try {
     // Parse all files in parallel, then merge+dedup in one pass
-    const results = await Promise.allSettled(state.files.map(f => extractCandidates(f)));
+    const results = await Promise.allSettled(state.files.map(f =>
+      extractCandidates(f).catch(e => { throw new Error(`${f.name}: ${e.message}`); })
+    ));
     const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
 
@@ -1519,7 +1521,9 @@ async function processFiles() {
   showProcessing();
   try {
     // Parse all files in parallel, then merge+dedup in one pass
-    const results = await Promise.allSettled(state.files.map(f => extractCandidates(f)));
+    const results = await Promise.allSettled(state.files.map(f =>
+      extractCandidates(f).catch(e => { throw new Error(`${f.name}: ${e.message}`); })
+    ));
     const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
 
@@ -1719,24 +1723,11 @@ async function syncIsraeliTransactions(sessionId) {
       source: t.source
     }));
 
-    // Merge transactions: skip duplicates by checking date+amount combinations
-    const existingKeys = new Set(state.transactions.map(t => `${t.date}|${t.amount}|${t.description}`));
-
-    for (const candidate of candidates) {
-      const key = `${candidate.date}|${candidate.amount}|${candidate.description}`;
-      if (!existingKeys.has(key)) {
-        state.transactions.push(candidate);
-      }
-    }
-
-    // Sort by date descending
-    state.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    // Save to storage
-    localStorage.setItem('transactions', JSON.stringify(state.transactions));
-
+    // Use the shared merge+dedup path so _isIncome/_isTransfer flags are set correctly
+    const { added, skipped } = mergeTransactions(candidates);
+    saveTransactions();
     hideProcessing();
-    alert(`✅ Successfully imported ${candidates.length} transactions from your Israeli bank!`);
+    alert(`✅ Successfully imported ${added} transactions from your Israeli bank!${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`);
 
     // Refresh the main app view
     renderTransactions();
@@ -1746,6 +1737,14 @@ async function syncIsraeliTransactions(sessionId) {
     hideProcessing();
     alert('Error syncing transactions: ' + err.message);
   }
+}
+
+// ─────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────
+// Escape HTML entities — use whenever inserting untrusted text into innerHTML
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ─────────────────────────────────────
@@ -1800,8 +1799,8 @@ function preprocessBankText(rawText) {
 function brAmount(str) {
   if (!str) return null;
   const s = str.replace(/\s/g, '');
-  const neg = s.startsWith('-') || s.endsWith('-');
-  // Strip currency symbol and thousands separators; replace comma decimal
+  const neg = s.startsWith('-') || s.endsWith('-') || (s.startsWith('(') && s.endsWith(')'));
+  // Strip currency symbol, thousands separators, parentheses; replace comma decimal
   const n = parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.'));
   return isNaN(n) ? null : (neg ? -n : n);
 }
@@ -1873,7 +1872,7 @@ function parseOFX(text) {
     const amt = parseFloat(get('TRNAMT') || '0');
     const desc = get('MEMO') || get('NAME') || '';
     const type = (get('TRNTYPE') || '').toUpperCase();
-    if (!dateStr || isNaN(amt) || !desc) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || isNaN(amt) || !desc) continue;
     const cat = type === 'TRANSFER' ? 'Transfers' : guessBrCategory(desc, amt);
     txns.push({ date: dateStr, description: desc, amount: amt, category: cat, source: 'OFX' });
   }
@@ -2058,7 +2057,7 @@ function parseNubankCSV(text) {
     const finalAmt = isPagamento ? Math.abs(amt) : -amt;
     txns.push({
       date, description: desc, amount: finalAmt,
-      category: isPagamento ? 'Transfers' : (mapNubankCategory(catRaw) !== 'Other' ? mapNubankCategory(catRaw) : guessBrCategory(desc, finalAmt)),
+      category: isPagamento ? 'Transfers' : (mapNubankCategory(catRaw) ?? guessBrCategory(desc, finalAmt)),
       source: 'Nubank'
     });
   }
@@ -2077,7 +2076,7 @@ function mapNubankCategory(cat) {
   if (c.includes('casa') || c.includes('moradia')) return 'Housing';
   if (c.includes('serviço') || c.includes('servico')) return 'Business Services';
   if (c.includes('compra') || c.includes('shopping')) return 'Shopping';
-  return 'Other';
+  return null; // null → caller falls back to guessBrCategory()
 }
 
 // Inter Bank CSV: "Data;Tipo;Descrição;Valor" (semicolon, already signed)
@@ -2860,8 +2859,8 @@ function filterTransactions() {
     const isPositive = txn.amount > 0;
     return `<div class="card-sm p-4 mb-2 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="highlight('${txn.id}')">
       <div class="flex-1 min-w-0 mr-2">
-        <p class="font-semibold text-slate-800 truncate" dir="auto">${txn.description}</p>
-        <p class="text-xs text-slate-500">${txn.date}</p>
+        <p class="font-semibold text-slate-800 truncate" dir="auto">${esc(txn.description)}</p>
+        <p class="text-xs text-slate-500">${esc(txn.date)}</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <p class="font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'}">${isPositive ? '+' : '-'}${fmt(Math.abs(txn.amount))}</p>
