@@ -435,7 +435,7 @@ function hebrewPostProcess(transactions) {
       return { ...t, category: 'Income' };
 
     // Papaya Global (payroll platform) — positive=salary in, negative=payroll out
-    if (/פאפאיה/.test(d))
+    if (/פאפאיה|papaya[\s_-]*(global)?/i.test(d))
       return { ...t, category: isCredit ? 'Income' : 'Transfers' };
 
     // Bank HaPoalim RTL column-reversal fix:
@@ -443,7 +443,7 @@ function hebrewPostProcess(transactions) {
     // in the חובה (debit) column due to RTL text extraction — but the balance INCREASES,
     // proving they are credits. We detect known employer names and correct the sign + category.
     // Pattern: company name ending in בע"מ (Ltd.) that is NOT a credit card / utility company.
-    if (/ג.ייפרוג/.test(d))
+    if (/ג.ייפרוג|jfrog/i.test(d))
       return { ...t, amount: Math.abs(t.amount), category: 'Income' };
 
     // Generic outgoing "העברה" (no salary keywords) → Transfers
