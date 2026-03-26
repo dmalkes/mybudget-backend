@@ -270,8 +270,8 @@
     <div class="big-upload-zone" id="uploadZone" onclick="document.getElementById('uploadFileInput').click()" ondragover="handleDragOver(event,'uploadZone')" ondragleave="handleDragLeave('uploadZone')" ondrop="handleDropUpload(event)">
       <div class="big-upload-zone-icon">📄</div>
       <p class="font-semibold text-slate-700 mb-1" data-i18n="upload_drop">Drop files here or tap to browse</p>
-      <p class="text-xs text-slate-500" data-i18n="upload_formats">CSV, XLSX, XLS, PDF, PNG, JPG</p>
-      <input id="uploadFileInput" type="file" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg" multiple onchange="handleUploadFiles(this.files)">
+      <p class="text-xs text-slate-500" data-i18n="upload_formats">CSV, XLSX, OFX, PDF, PNG, JPG</p>
+      <input id="uploadFileInput" type="file" class="hidden" accept=".csv,.xlsx,.xls,.ofx,.qfx,.pdf,.png,.jpg,.jpeg" multiple onchange="handleUploadFiles(this.files)">
     </div>
     <button onclick="document.getElementById('uploadFileInput').click()" class="onboarding-button secondary" style="margin-bottom:12px" data-i18n="upload_browse">Browse files</button>
     <button onclick="useTestData()" class="onboarding-button secondary" style="border-color:#10b981;color:#10b981" data-i18n="upload_sample">Try with sample data</button>
@@ -446,8 +446,8 @@
            ondragover="handleDragOver(event,'uploadZoneMain')" ondragleave="handleDragLeave('uploadZoneMain')" ondrop="handleDropMain(event)">
         <div class="text-3xl mb-2">📂</div>
         <p class="text-sm font-medium text-slate-700">Drop files or tap to browse</p>
-        <p class="text-xs text-slate-400 mt-0.5">PDF · PNG · JPG · XLSX · CSV</p>
-        <input id="fileInputMain" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv" multiple onchange="handleFilesMain(this.files)">
+        <p class="text-xs text-slate-400 mt-0.5">PDF · OFX · XLSX · CSV · PNG · JPG</p>
+        <input id="fileInputMain" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,.ofx,.qfx" multiple onchange="handleFilesMain(this.files)">
       </div>
       <div id="uploadFileListSheet" class="space-y-2 mb-3"></div>
       <button id="uploadProcessBtnSheet" onclick="processFiles()" class="hidden grad w-full text-white py-3 rounded-xl font-semibold text-sm">✨ Analyze with AI</button>
@@ -757,7 +757,7 @@ const STRINGS = {
     goal_reduce:'💰 Reduce unnecessary spending',goal_save:'🎯 Save for specific goals',
     method_spreadsheets:'📊 Spreadsheets',method_app:'📱 Other app',method_nothing:'🎯 Nothing yet',method_paper:'✍️ Pen and paper',
     upload_title:'Upload Your Data',upload_sub:'Drag and drop your bank statement or financial export.',
-    upload_drop:'Drop files here or tap to browse',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
+    upload_drop:'Drop files here or tap to browse',upload_formats:'CSV, XLSX, OFX, PDF, PNG, JPG',
     upload_browse:'Browse files',upload_sample:'Try with sample data',upload_analyze:'Analyze Files',
     upload_privacy:'🔒 Your data stays private. All processing happens securely and your financial data is never stored on our servers.',
     proc_messages:['Importing transactions…','Reading your statement…','Categorizing expenses…','Optimizing your budget…','Almost there…',"Since it's the first use, it may take some time"],
@@ -817,7 +817,7 @@ const STRINGS = {
     goal_reduce:'💰 Reduzir gastos desnecessários',goal_save:'🎯 Poupar para objetivos',
     method_spreadsheets:'📊 Planilhas',method_app:'📱 Outro aplicativo',method_nothing:'🎯 Nada ainda',method_paper:'✍️ Papel e caneta',
     upload_title:'Envie seus dados',upload_sub:'Arraste e solte seu extrato bancário ou exportação financeira.',
-    upload_drop:'Solte os arquivos aqui ou toque para procurar',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
+    upload_drop:'Solte os arquivos aqui ou toque para procurar',upload_formats:'CSV, XLSX, OFX, PDF, PNG, JPG',
     upload_browse:'Procurar arquivos',upload_sample:'Testar com dados de exemplo',upload_analyze:'Analisar arquivos',
     upload_privacy:'🔒 Seus dados ficam privados. Todo o processamento é feito com segurança e seus dados financeiros nunca são armazenados em nossos servidores.',
     proc_messages:['Importando transações…','Lendo seu extrato…','Categorizando despesas…','Otimizando seu orçamento…','Quase lá…','Como é a primeira vez, pode demorar um pouco'],
@@ -877,7 +877,7 @@ const STRINGS = {
     goal_reduce:'💰 להפחית הוצאות מיותרות',goal_save:'🎯 לחסוך למטרות ספציפיות',
     method_spreadsheets:'📊 גיליונות אלקטרוניים',method_app:'📱 אפליקציה אחרת',method_nothing:'🎯 עדיין שום דבר',method_paper:'✍️ עט ונייר',
     upload_title:'העלאת נתונים',upload_sub:'גרור ושחרר את דף החשבון שלך או קובץ ייצוא פיננסי.',
-    upload_drop:'שחרר קבצים כאן או הקש לעיון',upload_formats:'CSV, XLSX, XLS, PDF, PNG, JPG',
+    upload_drop:'שחרר קבצים כאן או הקש לעיון',upload_formats:'CSV, XLSX, OFX, PDF, PNG, JPG',
     upload_browse:'עיון בקבצים',upload_sample:'נסה עם נתוני דוגמה',upload_analyze:'ניתוח קבצים',
     upload_privacy:'🔒 הנתונים שלך נשארים פרטיים. כל העיבוד מתבצע בצורה מאובטחת ולעולם אינו מאוחסן בשרתים שלנו.',
     proc_messages:['מייבא עסקאות…','קורא את דף החשבון…','מסווג הוצאות…','מייעל את התקציב שלך…','כמעט מוכן…','בהיות שמדובר בשימוש ראשון, זה עשוי לקחת קצת יותר זמן'],
@@ -1784,6 +1784,145 @@ function preprocessBankText(rawText) {
 }
 
 // ─────────────────────────────────────
+// ─────────────────────────────────────
+// BRAZILIAN BANK PARSERS (deterministic, no AI needed)
+// ─────────────────────────────────────
+
+function brAmount(str) {
+  if (!str) return null;
+  const s = str.replace(/\s/g, '');
+  const neg = s.startsWith('-') || s.endsWith('-');
+  const n = parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.'));
+  return isNaN(n) ? null : (neg ? -n : n);
+}
+
+function brMonth(abbr) {
+  return {JAN:'01',FEV:'02',MAR:'03',ABR:'04',MAI:'05',JUN:'06',
+          JUL:'07',AGO:'08',SET:'09',OUT:'10',NOV:'11',DEZ:'12'}[abbr?.toUpperCase()] || null;
+}
+
+function parseOFX(text) {
+  const txns = [];
+  // Match both SGML-style (<TAG>value) and XML-style (<TAG>value</TAG>)
+  const blocks = text.split(/<STMTTRN>/i).slice(1);
+  for (const block of blocks) {
+    const get = (tag) => {
+      const m = block.match(new RegExp(`<${tag}>([^<\\n\\r]+)`, 'i'));
+      return m ? m[1].trim() : null;
+    };
+    const dtRaw = get('DTPOSTED') || get('DTUSER') || '';
+    const dateStr = dtRaw.replace(/(\d{4})(\d{2})(\d{2}).*/, '$1-$2-$3');
+    const amt = parseFloat(get('TRNAMT') || '0');
+    const desc = get('MEMO') || get('NAME') || '';
+    const type = (get('TRNTYPE') || '').toUpperCase();
+    if (!dateStr || isNaN(amt) || !desc) continue;
+    txns.push({
+      date: dateStr, description: desc, amount: amt,
+      category: amt > 0 ? 'Income' : type === 'TRANSFER' ? 'Transfers' : 'Other',
+      source: 'OFX'
+    });
+  }
+  return txns;
+}
+
+function parseNubankCC(text) {
+  const yearM = text.match(/FATURA\s+\d{1,2}\s+\w+\s+(\d{4})/i);
+  const year = yearM ? yearM[1] : new Date().getFullYear().toString();
+  const section = text.match(/TRANSA[ÇC][OÕ]ES\s+DE[\s\S]+/i);
+  if (!section) return null;
+  const txns = [];
+  for (const line of section[0].split('\n')) {
+    const m = line.match(/^(\d{1,2})\s+([A-ZÇÃÁÉÍÓÚÂÊÔÀÜ]{3})\s+(.+?)\s+([\d.]+,\d{2})\s*$/);
+    if (!m) continue;
+    const mon = brMonth(m[2]); if (!mon) continue;
+    const date = `${year}-${mon}-${m[1].padStart(2,'0')}`;
+    const amt = brAmount(m[4]); if (amt === null) continue;
+    const isPagamento = /pagamento/i.test(m[3]);
+    txns.push({ date, description: m[3].trim(), amount: isPagamento ? amt : -amt,
+      category: isPagamento ? 'Transfers' : 'Other', source: 'Nubank' });
+  }
+  return txns.length ? txns : null;
+}
+
+function parseBradescoCC(text) {
+  const yearM = text.match(/[Vv]encimento[:\s]+\d{2}\/\d{2}\/(\d{4})/);
+  const year = yearM ? yearM[1] : new Date().getFullYear().toString();
+  const section = text.match(/Lan[çc]amentos[\s\S]+/i);
+  if (!section) return null;
+  const txns = [];
+  for (const line of section[0].split('\n')) {
+    const m = line.match(/^(\d{2}\/\d{2})\s+(.+?)\s+([\d.]+,\d{2})\s*(-?)\s*$/);
+    if (!m) continue;
+    const [dd, mm] = m[1].split('/');
+    const date = `${year}-${mm}-${dd}`;
+    const amt = brAmount(m[3]); if (amt === null) continue;
+    const isCredit = m[4] === '-' || /pagto|pagamento|cr[eé]dito/i.test(m[2]);
+    txns.push({ date, description: m[2].trim(), amount: isCredit ? amt : -amt,
+      category: isCredit ? 'Transfers' : 'Other', source: 'Bradesco' });
+  }
+  return txns.length ? txns : null;
+}
+
+function parseItauAccount(text) {
+  if (!/(extrato conta|lan[çc]amentos)/i.test(text)) return null;
+  const txns = [];
+  for (const line of text.split('\n')) {
+    const m = line.match(/^(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+(-?[\d.]+,\d{2})\s*$/);
+    if (!m || /SALDO DO DIA/i.test(m[2])) continue;
+    const [dd, mm, yyyy] = m[1].split('/');
+    const date = `${yyyy}-${mm}-${dd}`;
+    const amt = brAmount(m[3]); if (amt === null) continue;
+    txns.push({ date, description: m[2].trim(), amount: amt,
+      category: amt > 0 ? 'Income' : 'Other', source: 'Itaú' });
+  }
+  return txns.length ? txns : null;
+}
+
+function parseItauCC(text) {
+  if (!/(itaucard|lan[çc]amentos.*compras)/i.test(text)) return null;
+  const yearM = text.match(/[Vv]encimento[:\s]*\d{2}\/\d{2}\/(\d{4})/);
+  const year = yearM ? yearM[1] : new Date().getFullYear().toString();
+  // Pattern matches transactions in both single and two-column layouts
+  const pat = /(\d{2}\/\d{2})\s+([A-Za-z][^-\d\n]*?)\s+(-\s*[\d.]+,\d{2}|[\d.]+,\d{2})/g;
+  const txns = [];
+  let inSection = false;
+  for (const line of text.split('\n')) {
+    if (/Lan[çc]amentos.*compras/i.test(line)) { inSection = true; continue; }
+    if (/Total dos lan[çc]amentos/i.test(line)) { inSection = false; continue; }
+    if (!inSection) continue;
+    let m;
+    while ((m = pat.exec(line)) !== null) {
+      const [dd, mm] = m[1].split('/');
+      const date = `${year}-${mm}-${dd}`;
+      const amt = brAmount(m[3].replace(/\s/g,'')); if (amt === null) continue;
+      txns.push({ date, description: m[2].trim(), amount: -Math.abs(amt),
+        category: 'Other', source: 'Itaucard' });
+    }
+    pat.lastIndex = 0; // reset for next line
+  }
+  return txns.length ? txns : null;
+}
+
+function tryBrazilianBankParser(text) {
+  if (!text) return null;
+  try {
+    const t = text.toLowerCase();
+    if (t.includes('nu pagamentos') || (t.includes('nubank') && t.includes('fatura')))
+      return parseNubankCC(text);
+    if (t.includes('bradesco') && t.includes('lançamentos'))
+      return parseBradescoCC(text);
+    if ((t.includes('itaú') || t.includes('itau')) && t.includes('extrato conta'))
+      return parseItauAccount(text);
+    if ((t.includes('itaú') || t.includes('itaucard')) && t.includes('compras e saques'))
+      return parseItauCC(text);
+    if (/<stmttrn>/i.test(text) || /OFXHEADER/i.test(text))
+      return parseOFX(text);
+  } catch(e) {
+    console.warn('Brazilian bank parser error:', e);
+  }
+  return null;
+}
+
 // FILE PROCESSING — parallel-ready
 // ─────────────────────────────────────
 
@@ -1794,10 +1933,13 @@ async function extractCandidates(file) {
   let rawText;
 
   if (file.type.includes('image')) {
-    // Image: send to backend for vision-based extraction
     const b64 = await fileToBase64(file);
-    const resp = await callClaude(b64); // backend handles vision
+    const resp = await callClaude(b64);
     return (resp.transactions || []);
+  } else if (name.endsWith('.ofx') || name.endsWith('.qfx')) {
+    rawText = await file.text();
+    const result = parseOFX(rawText);
+    if (result.length) return result;
   } else if (name.endsWith('.pdf')) {
     rawText = await extractPDFText(file);
   } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
@@ -1810,6 +1952,11 @@ async function extractCandidates(file) {
     return [];
   }
 
+  // Try deterministic bank-specific parser first (faster, more accurate, no API call)
+  const bankResult = tryBrazilianBankParser(rawText);
+  if (bankResult !== null && bankResult.length > 0) return bankResult;
+
+  // Fall back to Claude
   const cleaned = preprocessBankText(rawText);
   const resp    = await callClaude(cleaned);
   return resp.transactions || [];
@@ -1829,9 +1976,15 @@ async function extractPDFText(file) {
       const rows    = {};
       content.items.forEach(item => {
         const y = Math.round(item.transform ? item.transform[5] : (item.y || 0));
-        if (item.str) (rows[y] = rows[y] || []).push(item.str);
+        const x = item.transform ? item.transform[4] : 0;
+        if (item.str) {
+          if (!rows[y]) rows[y] = [];
+          rows[y].push({ t: item.str, x });
+        }
       });
-      return Object.keys(rows).sort((a, b) => b - a).map(y => rows[y].join(' ')).join('\n');
+      // Sort by X within each row to preserve left-to-right column order
+      return Object.keys(rows).sort((a, b) => b - a)
+        .map(y => rows[y].sort((a, b) => a.x - b.x).map(i => i.t).join(' ')).join('\n');
     } catch (e) {
       console.warn(`Page ${i} extraction failed:`, e);
       return '';
