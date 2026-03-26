@@ -1308,12 +1308,21 @@ function loadStorage() {
       // Migration: fix known classification issues on stored transactions
       let migrationDirty = false;
       state.transactions.forEach(t => {
-        const d = t.originalDescription || t.description || '';
-        // Bank HaPoalim RTL fix: ג'ייפרוג (JFrog) appears in חובה column but is income
-        if (/ג.ייפרוג/i.test(d) && t.category !== 'Income') {
+        const d = (t.originalDescription || t.description || '') + ' ' + (t.description || '');
+        // Bank HaPoalim RTL fix: JFrog appears in חובה column but is income; fix sign too
+        if (/ג.ייפרוג|jfrog/i.test(d) && t.category !== 'Income') {
           t.category = 'Income';
           t.amount = Math.abs(t.amount);
           migrationDirty = true;
+        }
+        // Papaya Global (payroll): positive = income, negative = transfer (bill payment)
+        if (/פאפאיה|papaya[\s_-]*(global)?/i.test(d)) {
+          const correctCat = t.amount > 0 ? 'Income' : 'Transfers';
+          if (t.category !== correctCat) { t.category = correctCat; migrationDirty = true; }
+        }
+        // Hebrew salary keywords with positive amount
+        if (t.amount > 0 && /משכורת|שכר עבודה|שכר|פיצוי|בונוס|תגמול/i.test(d) && t.category !== 'Income') {
+          t.category = 'Income'; migrationDirty = true;
         }
         // Re-derive flags from category (catches any past misclassification or stale flags)
         const shouldBeIncome   = t.category === 'Income';
@@ -2407,7 +2416,22 @@ function mergeTransactions(candidates) {
     if (existingKeys.has(key)) { skipped++; continue; }
     existingKeys.add(key); // prevent intra-batch dupes
 
-    const cat = p.category || 'Other';
+    let cat = p.category || 'Other';
+    const descFull = (origText + ' ' + (p.description || '')).toLowerCase();
+    // ── Israeli known-employer overrides (mirrors server hebrewPostProcess) ──
+    // JFrog: appears in חובה column due to RTL extraction — always income, fix sign
+    if (/ג.ייפרוג|jfrog/i.test(descFull)) {
+      cat = 'Income';
+      p = { ...p, amount: Math.abs(p.amount) };
+    }
+    // Papaya Global (payroll platform): positive = salary in, negative = payroll out
+    else if (/פאפאיה|papaya[\s_-]*(global)?/i.test(descFull)) {
+      cat = p.amount > 0 ? 'Income' : 'Transfers';
+    }
+    // Hebrew salary/bonus keywords with positive amount
+    else if (p.amount > 0 && /משכורת|שכר עבודה|שכר|פיצוי|בונוס|תגמול/i.test(descFull)) {
+      cat = 'Income';
+    }
     const isIncome   = cat === 'Income';
     const isTransfer = cat === 'Transfers';
     const txnId = Math.random().toString(36).slice(2);
