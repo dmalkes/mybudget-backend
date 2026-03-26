@@ -465,7 +465,7 @@
           <p class="text-white/70 text-xs font-semibold uppercase tracking-wide mb-1" data-i18n="spent_this_month">Spent this month</p>
           <p id="heroTotal" class="text-4xl font-extrabold mb-0.5">R$0</p>
         </div>
-        <div id="heroIncomeBox" class="text-right hidden">
+        <div id="heroIncomeBox" class="text-right">
           <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-1" data-i18n="income_label">Income</p>
           <p id="heroIncome" class="text-4xl font-extrabold text-emerald-300 mb-1.5">R$0</p>
           <div class="flex justify-end gap-4">
@@ -480,21 +480,13 @@
           </div>
         </div>
       </div>
-      <!-- Balance strip — shown when income data present -->
-      <div id="heroBalanceRow" class="hidden mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
+      <!-- Balance strip — always shown -->
+      <div id="heroBalanceRow" class="mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
         <div>
           <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="balance_label">Balance</p>
-          <p id="heroBalance" class="text-xl font-bold">R$0</p>
+          <p id="heroBalance" class="text-xl font-bold text-white/60">—</p>
         </div>
         <span id="heroCount" class="text-white/50 text-xs"></span>
-        <div class="flex items-center gap-2">
-          <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
-          <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
-        </div>
-      </div>
-      <!-- Bottom row — when no income recorded -->
-      <div id="heroNoIncomeRow" class="flex items-center justify-between mt-3">
-        <span id="heroCountNoIncome" class="text-white/60 text-xs"></span>
         <div class="flex items-center gap-2">
           <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
           <button onclick="switchTab('insights')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">✨ Insights →</button>
@@ -2591,24 +2583,19 @@ function renderDashboard() {
   const totalIncome = fixedIncome + variableIncome;
 
   document.getElementById('heroTotal').textContent = fmt(totalSpent);
+  document.getElementById('heroIncome').textContent = fmt(totalIncome);
+  document.getElementById('heroIncomeFixed').textContent = fmt(fixedIncome);
+  document.getElementById('heroIncomeVariable').textContent = fmt(variableIncome);
+  document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
 
+  const balEl = document.getElementById('heroBalance');
   if (totalIncome > 0) {
-    document.getElementById('heroIncomeBox').classList.remove('hidden');
-    document.getElementById('heroIncome').textContent = fmt(totalIncome);
-    document.getElementById('heroIncomeFixed').textContent = fmt(fixedIncome);
-    document.getElementById('heroIncomeVariable').textContent = fmt(variableIncome);
     const net = totalIncome - totalSpent;
-    const balEl = document.getElementById('heroBalance');
     balEl.textContent = (net >= 0 ? '+' : '-') + fmt(Math.abs(net));
     balEl.style.color = net >= 0 ? '#6ee7b7' : '#fca5a5';
-    document.getElementById('heroBalanceRow').classList.remove('hidden');
-    document.getElementById('heroNoIncomeRow').classList.add('hidden');
-    document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
   } else {
-    document.getElementById('heroIncomeBox').classList.add('hidden');
-    document.getElementById('heroBalanceRow').classList.add('hidden');
-    document.getElementById('heroNoIncomeRow').classList.remove('hidden');
-    document.getElementById('heroCountNoIncome').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
+    balEl.textContent = '—';
+    balEl.style.color = 'rgba(255,255,255,0.4)';
   }
   renderAnomalyAlerts();
 
