@@ -366,6 +366,29 @@
   </div>
 </div>
 
+<!-- ══════════════ REVIEW MODAL ══════════════ -->
+<div id="reviewModal" class="hidden fixed inset-0 flex-col bg-slate-50" style="z-index:150">
+  <!-- Header -->
+  <div class="grad px-5 py-4 text-white flex-shrink-0">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-base font-bold">Review Transactions</h2>
+      <button onclick="reviewDone()" class="text-white/60 text-sm font-semibold hover:text-white px-2 py-1">Skip →</button>
+    </div>
+    <p id="reviewSubtitle" class="text-white/70 text-sm mb-3">AI wasn't sure about these transactions</p>
+    <div class="bg-white/20 rounded-full h-1.5">
+      <div id="reviewProgressBar" class="bg-white rounded-full h-1.5 transition-all duration-500" style="width:0%"></div>
+    </div>
+    <p id="reviewProgressText" class="text-white/60 text-xs mt-1.5"></p>
+  </div>
+  <!-- Scrollable list -->
+  <div id="reviewList" class="flex-1 overflow-y-auto px-4 py-3 space-y-3"></div>
+  <!-- Footer -->
+  <div class="flex-shrink-0 px-4 py-3 bg-white border-t border-slate-200 flex gap-3" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
+    <button onclick="reviewDone()" class="flex-1 py-3 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-500">Skip remaining</button>
+    <button onclick="reviewDone()" class="flex-1 py-3 rounded-xl grad text-white text-sm font-semibold" style="box-shadow:0 4px 14px rgba(99,102,241,.3)">Done ✓</button>
+  </div>
+</div>
+
 <!-- Israeli Bank Login Modal -->
 <div id="israeliBankModal" style="position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)">
   <div style="background:white;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:24px 24px 36px;max-height:92vh;overflow-y:auto;box-shadow:0 -8px 32px rgba(0,0,0,.15)">
@@ -1541,14 +1564,15 @@ async function processUploadedFiles() {
     const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
 
-    const { added, skipped, income, transfers, expenses } = mergeTransactions(allCandidates);
+    const { added, skipped, income, transfers, expenses, needsReview } = mergeTransactions(allCandidates);
     saveTransactions();
     hideProcessing();
-    startApp();
     const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
     const msg = `✅ Added ${added} transactions${breakdown}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`;
-    showToast(msg, 5000);
     if (errors.length) console.warn('Some files failed:', errors);
+    const goToApp = () => { startApp(); showToast(msg, 5000); };
+    if (needsReview.length > 0) showReviewModal(needsReview, goToApp);
+    else goToApp();
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -1568,10 +1592,9 @@ async function processFiles() {
     const allCandidates = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
 
-    const { added, skipped, income, transfers, expenses } = mergeTransactions(allCandidates);
+    const { added, skipped, income, transfers, expenses, needsReview } = mergeTransactions(allCandidates);
     saveTransactions();
     hideProcessing();
-    renderDashboard();
     const breakdown = added > 0 ? ` · ${expenses} expense${expenses!==1?'s':''}, ${income} income, ${transfers} transfer${transfers!==1?'s':''}` : '';
     let msg;
     if (added === 0 && allCandidates.length === 0) {
@@ -1581,11 +1604,16 @@ async function processFiles() {
     } else {
       msg = `✅ Added ${added} transaction${added!==1?'s':''}${breakdown}${skipped > 0 ? ` (${skipped} duplicate${skipped!==1?'s':''} skipped)` : ''}`;
     }
-    showToast(msg, 6000);
     if (errors.length) {
       console.warn('Some files failed:', errors);
-      showToast(`⚠ ${errors.length} file${errors.length!==1?'s':''} failed to process. Check console for details.`, 6000);
     }
+    const goToDashboard = () => {
+      renderDashboard();
+      showToast(msg, 6000);
+      if (errors.length) showToast(`⚠ ${errors.length} file${errors.length!==1?'s':''} failed to process. Check console for details.`, 6000);
+    };
+    if (needsReview.length > 0) showReviewModal(needsReview, goToDashboard);
+    else goToDashboard();
   } catch (e) {
     console.error('Process error:', e);
     hideProcessing();
@@ -2365,6 +2393,7 @@ async function extractPDFText(file) {
 // against each other, then pushes to state. Returns { added, skipped, income, transfers, expenses }.
 function mergeTransactions(candidates) {
   let added = 0, skipped = 0, income = 0, transfers = 0, expenses = 0;
+  const needsReview = []; // IDs of new txns where AI category = 'Other'
   // Build a fast-lookup key set from existing transactions
   const existingKeys = new Set(state.transactions.map(e =>
     `${e.date}|${Math.round(Math.abs(e.amount) * 100)}|${(e.originalDescription || e.orig || e.description || '').slice(0, 40)}`
@@ -2381,8 +2410,9 @@ function mergeTransactions(candidates) {
     const cat = p.category || 'Other';
     const isIncome   = cat === 'Income';
     const isTransfer = cat === 'Transfers';
+    const txnId = Math.random().toString(36).slice(2);
     state.transactions.push({
-      id: Math.random().toString(36).slice(2),
+      id: txnId,
       date: p.date,
       billingDate: p.date,
       description: p.description,
@@ -2399,8 +2429,9 @@ function mergeTransactions(candidates) {
     if (isIncome) income++;
     else if (isTransfer) transfers++;
     else expenses++;
+    if (cat === 'Other') needsReview.push(txnId);
   }
-  return { added, skipped, income, transfers, expenses };
+  return { added, skipped, income, transfers, expenses, needsReview };
 }
 
 
@@ -3055,6 +3086,128 @@ function selectCategory(cat) {
   closeCatModal();
   filterTransactions();
   renderBudgetPage();
+}
+
+// ─────────────────────────────────────
+// REVIEW MODAL
+// ─────────────────────────────────────
+const REVIEW_QUICK_CATS = [
+  ['Food & Dining','🍕'],['Groceries','🛒'],['Transportation','🚗'],
+  ['Shopping','🛍️'],['Utilities','💡'],['Health & Medical','💊'],
+  ['Entertainment','🎬'],['Income','💰'],['Transfers','🔄'],
+];
+
+let _reviewCallback = null;
+let _reviewIds = [];
+
+function showReviewModal(txnIds, onDone) {
+  if (!txnIds || txnIds.length === 0) { onDone(); return; }
+  _reviewCallback = onDone;
+  _reviewIds = [...txnIds];
+
+  const list = document.getElementById('reviewList');
+  list.innerHTML = txnIds.map(id => {
+    const txn = state.transactions.find(t => t.id === id);
+    if (!txn) return '';
+    const origDesc = txn.originalDescription || txn.description || '';
+    const desc = txn.description || origDesc;
+    const showOrig = origDesc && origDesc !== desc && origDesc.length < 80;
+    const dateStr = txn.date
+      ? new Date(txn.date + 'T12:00:00').toLocaleDateString('en', {day:'numeric', month:'short'})
+      : '';
+    const amtStr = fmt(Math.abs(txn.amount));
+    const isNeg = txn.amount < 0;
+
+    const catBtns = REVIEW_QUICK_CATS.map(([cat, emoji]) =>
+      `<button onclick="reviewAssignCat('${id}','${cat.replace(/'/g,"\\'")}')"` +
+      ` class="text-[11px] font-semibold py-1.5 rounded-lg text-white leading-tight transition-all active:scale-95"` +
+      ` data-review-id="${id}" data-cat="${esc(cat)}"` +
+      ` style="background:${CAT_COLORS[cat]||'#9ca3af'};opacity:0.7">` +
+      `${emoji} ${cat.split(' ')[0]}</button>`
+    ).join('');
+
+    return `<div id="review-card-${id}" class="card p-4 transition-opacity duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="min-w-0 flex-1 pr-3">
+          <p class="font-semibold text-slate-800 text-sm">${esc(desc)}</p>
+          ${showOrig ? `<p class="text-slate-400 text-xs truncate mt-0.5">${esc(origDesc)}</p>` : ''}
+          <p class="text-slate-400 text-xs mt-0.5">${dateStr}</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <p class="font-bold text-sm ${isNeg ? 'text-red-600' : 'text-emerald-600'}">${isNeg ? '−' : '+'}${amtStr}</p>
+          <span id="review-badge-${id}" class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-400">Other</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-1.5 mb-2">${catBtns}</div>
+      <button onclick="reviewOpenFull('${id}')" class="text-indigo-500 text-xs font-medium hover:text-indigo-700">More categories →</button>
+    </div>`;
+  }).join('');
+
+  _updateReviewProgress();
+  const modal = document.getElementById('reviewModal');
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+}
+
+function _updateReviewProgress() {
+  const total = _reviewIds.length;
+  const remaining = _reviewIds.filter(id => {
+    const tx = state.transactions.find(t => t.id === id);
+    return tx && tx.category === 'Other';
+  }).length;
+  const done = total - remaining;
+  document.getElementById('reviewProgressBar').style.width = (total > 0 ? done / total * 100 : 100) + '%';
+  document.getElementById('reviewProgressText').textContent = `${done} of ${total} categorized`;
+  document.getElementById('reviewSubtitle').textContent = remaining === 0
+    ? '✓ All done!' : `${remaining} transaction${remaining !== 1 ? 's' : ''} need your input`;
+}
+
+function reviewAssignCat(txnId, cat) {
+  const txn = state.transactions.find(t => t.id === txnId);
+  if (!txn) return;
+  txn.category = cat;
+  txn._isIncome   = cat === 'Income';
+  txn._isTransfer = cat === 'Transfers';
+
+  const badge = document.getElementById(`review-badge-${txnId}`);
+  if (badge) { badge.textContent = cat; badge.style.background = CAT_COLORS[cat] || '#6366f1'; badge.style.color = 'white'; }
+
+  document.querySelectorAll(`[data-review-id="${txnId}"]`).forEach(btn => {
+    const isThis = btn.dataset.cat === cat;
+    btn.style.opacity = isThis ? '1' : '0.35';
+    btn.style.transform = isThis ? 'scale(1.06)' : '';
+    btn.style.boxShadow = isThis ? '0 2px 8px rgba(0,0,0,.2)' : '';
+  });
+
+  const card = document.getElementById(`review-card-${txnId}`);
+  if (card) setTimeout(() => { card.style.opacity = '0.4'; }, 400);
+  _updateReviewProgress();
+}
+
+function reviewOpenFull(txnId) {
+  state.editingTxnId = txnId;
+  const txn = state.transactions.find(t => t.id === txnId);
+  if (!txn) return;
+  document.getElementById('catModalMerchantName').textContent = txn.description;
+  document.getElementById('catModalGrid').innerHTML = allCategories().map(c => {
+    const sel = c === txn.category;
+    return `<button class="cat-pill ${sel ? 'ring-2 ring-indigo-500' : ''}" style="background:${CAT_COLORS[c]||'#e5e7eb'};color:white;opacity:${sel?'1':'.6'}" onclick="reviewSelectFromFull('${txnId}','${c.replace(/'/g,"\\'")}')">` + c + `</button>`;
+  }).join('');
+  document.getElementById('catModal').classList.add('open');
+}
+
+function reviewSelectFromFull(txnId, cat) {
+  closeCatModal();
+  reviewAssignCat(txnId, cat);
+}
+
+function reviewDone() {
+  saveTransactions();
+  const modal = document.getElementById('reviewModal');
+  modal.style.display = 'none';
+  modal.classList.add('hidden');
+  _reviewIds = [];
+  if (_reviewCallback) { const cb = _reviewCallback; _reviewCallback = null; cb(); }
 }
 
 function pickNewCatColor(btn, color) {
