@@ -725,20 +725,30 @@ app.post('/api/belvo/widget-token', async (req, res) => {
     return res.status(503).json({ error: 'Belvo not configured. Set BELVO_SECRET_ID and BELVO_SECRET_PASSWORD.' });
   }
   try {
+    const { cpf, name } = req.body || {};
+
+    const tokenPayload = {
+      id: BELVO_SECRET_ID,
+      password: BELVO_SECRET_PASSWORD,
+      scopes: 'read_institutions,write_links,read_consents,write_consents,write_consent_callback,delete_consents',
+      fetch_resources: ['ACCOUNTS', 'TRANSACTIONS', 'OWNERS'],
+      credentials_storage: 'store',
+      stale_in: '300d'
+    };
+
+    // Brazil Open Finance requires identification_info with CPF
+    if (cpf) {
+      tokenPayload.identification_info = [{ cpf, name: name || '' }];
+      tokenPayload.permissions = ['REGISTER', 'ACCOUNTS', 'CREDIT_CARDS', 'CREDIT_OPERATIONS'];
+    }
+
     const response = await fetch(`${BELVO_BASE_URL}/api/token/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': belvoAuthHeader()
       },
-      body: JSON.stringify({
-        id: BELVO_SECRET_ID,
-        password: BELVO_SECRET_PASSWORD,
-        scopes: 'read_institutions,write_links,read_consents,write_consents,write_consent_callback,delete_consents',
-        fetch_resources: ['ACCOUNTS', 'TRANSACTIONS', 'OWNERS'],
-        credentials_storage: 'store',
-        stale_in: '300d'
-      })
+      body: JSON.stringify(tokenPayload)
     });
     if (!response.ok) {
       const err = await response.text();
