@@ -2462,10 +2462,13 @@ function toggleFixed(txnId) {
 // RENDERING
 // ─────────────────────────────────────
 function renderDashboard() {
+  // Exclude future-dated transactions (parsing errors — e.g. year assigned incorrectly)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const validTxns = state.transactions.filter(t => t.date && t.date <= todayStr);
   // Use category-based flags — more reliable than amount sign
   // (credit card statements return spending as positive amounts)
-  const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
-  const credits = state.transactions.filter(t => t._isIncome);
+  const spending = validTxns.filter(t => !t._isIncome && !t._isTransfer);
+  const credits = validTxns.filter(t => t._isIncome);
 
   // Fall back to most recent data month if current calendar month has no spending
   const nowMonth = new Date().toISOString().slice(0, 7);
@@ -2693,8 +2696,9 @@ function detectSubscriptions(txns) {
 }
 
 function renderBudgetPage() {
+  const todayStr = new Date().toISOString().slice(0, 10);
   const month = document.getElementById('budgetMonthFilter')?.value || new Date().toISOString().slice(0, 7);
-  const txns = state.transactions.filter(t => budgetMonth(t) === month);
+  const txns = state.transactions.filter(t => t.date && t.date <= todayStr && budgetMonth(t) === month);
   const debits = txns.filter(t => !t._isIncome && !t._isTransfer);
   const credits = txns.filter(t => t._isIncome);
 
