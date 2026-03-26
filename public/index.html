@@ -437,35 +437,30 @@
 
     <!-- Summary hero card -->
     <div class="grad rounded-2xl p-6 mb-4 text-white fade-up" style="box-shadow:0 6px 24px rgba(99,102,241,.3)">
-      <!-- Two-column grid: Spending | Income -->
       <div class="grid grid-cols-2 gap-0">
-        <!-- Left: Spent this month -->
-        <div class="pr-4">
-          <p class="text-white/70 text-xs font-semibold uppercase tracking-wide mb-1" data-i18n="spent_this_month">Spent this month</p>
-          <p id="heroTotal" class="text-3xl font-extrabold leading-tight truncate">R$0</p>
-        </div>
-        <!-- Right: Income — separated by left border -->
-        <div id="heroIncomeBox" class="pl-4 border-l border-white/20">
-          <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-1 text-right" data-i18n="income_label">Income</p>
-          <p id="heroIncome" class="text-3xl font-extrabold text-emerald-300 leading-tight text-right truncate">R$0</p>
-          <div class="flex justify-end gap-4 mt-1.5">
-            <div class="text-right">
-              <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_fixed">Fixed</p>
-              <p id="heroIncomeFixed" class="text-sm font-semibold text-emerald-200/80">R$0</p>
+        <!-- Left: Balance (big) + Income + Transfer in -->
+        <div class="pr-4 border-r border-white/20">
+          <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="balance_label">Balance</p>
+          <p id="heroBalance" class="text-3xl font-extrabold leading-tight mb-3" style="color:rgba(255,255,255,.4)">—</p>
+          <div class="space-y-1.5">
+            <div>
+              <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_label">Income</p>
+              <p id="heroIncome" class="text-sm font-semibold text-emerald-300">R$0</p>
             </div>
-            <div class="text-right">
-              <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_variable">Variable</p>
-              <p id="heroIncomeVariable" class="text-sm font-semibold text-emerald-200/80">R$0</p>
+            <div>
+              <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="transfer_in_label">Transfer in</p>
+              <p id="heroTransferIn" class="text-sm font-semibold text-sky-300">R$0</p>
             </div>
           </div>
         </div>
-      </div>
-      <!-- Balance strip — always shown -->
-      <div id="heroBalanceRow" class="mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
-        <div>
-          <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="balance_label">Balance</p>
-          <p id="heroBalance" class="text-xl font-bold text-white/40">—</p>
+        <!-- Right: Monthly spend (big) -->
+        <div class="pl-4 flex flex-col justify-center text-right">
+          <p class="text-white/70 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="spent_this_month">Spent this month</p>
+          <p id="heroTotal" class="text-3xl font-extrabold leading-tight truncate">R$0</p>
         </div>
+      </div>
+      <!-- Bottom strip -->
+      <div class="mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
         <span id="heroCount" class="text-white/50 text-xs"></span>
         <div class="flex items-center gap-2">
           <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
@@ -770,6 +765,7 @@ const STRINGS = {
     chart_spending: 'Spending', chart_income: 'Income',
     spent_this_month: 'Spent this month', income_label: 'Income',
     income_fixed: 'Fixed', income_variable: 'Variable',
+    transfer_in_label: 'Transfer in',
     balance_label: 'Balance', hero_net_prefix: 'Net:', hero_txns: 'transactions',
     anomaly_title: '⚠ Spending Alerts', anomaly_avg: 'avg',
     fv_title: 'Fixed vs Variable', fv_details: 'Details →',
@@ -832,6 +828,7 @@ const STRINGS = {
     chart_spending: 'Gastos', chart_income: 'Renda',
     spent_this_month: 'Gasto este mês', income_label: 'Renda',
     income_fixed: 'Fixo', income_variable: 'Variável',
+    transfer_in_label: 'Entrada',
     balance_label: 'Saldo', hero_net_prefix: 'Líquido:', hero_txns: 'transações',
     anomaly_title: '⚠ Alertas de Gastos', anomaly_avg: 'média',
     fv_title: 'Fixo vs Variável', fv_details: 'Detalhes →',
@@ -894,6 +891,7 @@ const STRINGS = {
     chart_spending: 'הוצאות', chart_income: 'הכנסות',
     spent_this_month: 'הוצאות החודש', income_label: 'הכנסות',
     income_fixed: 'קבוע', income_variable: 'משתנה',
+    transfer_in_label: 'העברה נכנסת',
     balance_label: 'מאזן', hero_net_prefix: 'נטו:', hero_txns: 'תנועות',
     anomaly_title: '⚠ התראות הוצאות', anomaly_avg: 'ממוצע',
     fv_title: 'קבוע מול משתנה', fv_details: 'פרטים ←',
@@ -953,6 +951,22 @@ const CAT_KEY_MAP = {
   'Income':'cat_income','Cash & ATM':'cat_cash','Banking Fees':'cat_banking','Other':'cat_other'
 };
 function tCat(cat) { return t(CAT_KEY_MAP[cat] || cat) || cat; }
+
+// Build reverse map: any translated name → canonical English category key
+const CAT_LOCALE_MAP = (() => {
+  const m = {};
+  for (const [engCat, key] of Object.entries(CAT_KEY_MAP)) {
+    for (const lang of Object.values(STRINGS)) {
+      if (lang[key]) m[lang[key]] = engCat;
+    }
+  }
+  return m;
+})();
+function normalizeCategory(cat) {
+  if (!cat) return 'Other';
+  if (CATEGORIES.includes(cat)) return cat;
+  return CAT_LOCALE_MAP[cat] || cat;
+}
 
 function applyLanguage() {
   const isRTL = state.language === 'Hebrew';
@@ -1263,6 +1277,9 @@ function loadStorage() {
       let migrationDirty = false;
       state.transactions.forEach(t => {
         const d = (t.originalDescription || t.description || '') + ' ' + (t.description || '');
+        // Normalize any translated category names (Portuguese/Hebrew) back to English
+        const normalized = normalizeCategory(t.category);
+        if (normalized !== t.category) { t.category = normalized; migrationDirty = true; }
         // Bank HaPoalim RTL fix: JFrog appears in חובה column but is income; fix sign too
         if (/ג.ייפרוג|jfrog/i.test(d) && t.category !== 'Income') {
           t.category = 'Income';
@@ -2185,7 +2202,7 @@ function mergeTransactions(candidates) {
     if (existingKeys.has(key)) { skipped++; continue; }
     existingKeys.add(key); // prevent intra-batch dupes
 
-    let cat = p.category || 'Other';
+    let cat = normalizeCategory(p.category || 'Other');
     let txnAmount = p.amount;
     const descFull = (origText + ' ' + (p.description || '')).toLowerCase();
     // ── Israeli known-employer overrides (mirrors server hebrewPostProcess) ──
@@ -2407,27 +2424,21 @@ function renderDashboard() {
 
   const totalSpent = thisMonthTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
 
-  // Income breakdown: fixed = salary/regular, variable = other income + incoming PIX/TED (Transfers with positive amount)
-  const salaryCats = thisMonthIncome.filter(tx => /sal[aá]rio|folha|salario|payroll/i.test(tx.description));
-  const fixedIncome = salaryCats.reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  const otherIncome = thisMonthIncome.filter(tx => !/sal[aá]rio|folha|salario|payroll/i.test(tx.description))
-    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  // Incoming PIX/TED (positive Transfers) count as variable income in the display
+  // Income breakdown: pure income (salary + other) separated from incoming transfers
+  const totalIncome = thisMonthIncome.reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  // Incoming PIX/TED/transfers (positive Transfers category) shown separately
   const incomingTransfers = validTxns.filter(tx =>
     budgetMonth(tx) === thisMonth && (tx._isTransfer || tx.category === 'Transfers') && tx.amount > 0
   ).reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  const variableIncome = otherIncome + incomingTransfers;
-  const totalIncome = fixedIncome + variableIncome;
 
   document.getElementById('heroTotal').textContent = fmt(totalSpent);
   document.getElementById('heroIncome').textContent = fmt(totalIncome);
-  document.getElementById('heroIncomeFixed').textContent = fmt(fixedIncome);
-  document.getElementById('heroIncomeVariable').textContent = fmt(variableIncome);
+  document.getElementById('heroTransferIn').textContent = fmt(incomingTransfers);
   document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
 
   const balEl = document.getElementById('heroBalance');
-  if (totalIncome > 0) {
-    const net = totalIncome - totalSpent;
+  if (totalIncome > 0 || incomingTransfers > 0) {
+    const net = totalIncome + incomingTransfers - totalSpent;
     balEl.textContent = (net >= 0 ? '+' : '-') + fmt(Math.abs(net));
     balEl.style.color = net >= 0 ? '#6ee7b7' : '#fca5a5';
   } else {
@@ -2845,7 +2856,7 @@ function openCatModal(txnId) {
   const grid = document.getElementById('catModalGrid');
   grid.innerHTML = cats.map(c => {
     const selected = c === txn.category;
-    return `<button class="cat-pill ${selected ? 'ring-2 ring-indigo-500' : ''}" style="background:${CAT_COLORS[c] || '#e5e7eb'};color:white;opacity:${selected ? '1' : '.6'}" onclick="selectCategory('${c}')">${c}</button>`;
+    return `<button class="cat-pill ${selected ? 'ring-2 ring-indigo-500' : ''}" style="background:${CAT_COLORS[c] || '#e5e7eb'};color:white;opacity:${selected ? '1' : '.6'}" onclick="selectCategory('${c}')">${tCat(c)}</button>`;
   }).join('');
 
   document.getElementById('catModal').classList.add('open');
@@ -2985,7 +2996,7 @@ function reviewOpenFull(txnId) {
   document.getElementById('catModalMerchantName').textContent = txn.description;
   document.getElementById('catModalGrid').innerHTML = allCategories().map(c => {
     const sel = c === txn.category;
-    return `<button class="cat-pill ${sel ? 'ring-2 ring-indigo-500' : ''}" style="background:${CAT_COLORS[c]||'#e5e7eb'};color:white;opacity:${sel?'1':'.6'}" onclick="reviewSelectFromFull('${txnId}','${c.replace(/'/g,"\\'")}')">` + c + `</button>`;
+    return `<button class="cat-pill ${sel ? 'ring-2 ring-indigo-500' : ''}" style="background:${CAT_COLORS[c]||'#e5e7eb'};color:white;opacity:${sel?'1':'.6'}" onclick="reviewSelectFromFull('${txnId}','${c.replace(/'/g,"\\'")}')">` + tCat(c) + `</button>`;
   }).join('');
   document.getElementById('catModal').classList.add('open');
 }

@@ -115,6 +115,39 @@ function extractJSON(text) {
   return null;
 }
 
+const VALID_CATEGORIES = new Set([
+  'Food & Dining','Groceries','Transportation','Shopping','Entertainment',
+  'Health & Medical','Utilities','Subscriptions & Software','Travel','Education',
+  'Home & Garden','Personal Care','Insurance','Business Services','Loans & Debt',
+  'Housing','Transfers','Refunds & Credits','Income','Cash & ATM','Banking Fees','Other'
+]);
+
+// Map known translated category names → canonical English key
+const CAT_LOCALE_MAP = {
+  // Portuguese
+  'Alimentação':'Food & Dining','Supermercado':'Groceries','Transporte':'Transportation',
+  'Compras':'Shopping','Entretenimento':'Entertainment','Saúde':'Health & Medical',
+  'Serviços':'Utilities','Assinaturas':'Subscriptions & Software','Viagem':'Travel',
+  'Educação':'Education','Casa e Jardim':'Home & Garden','Cuidados Pessoais':'Personal Care',
+  'Seguros':'Insurance','Serviços Empresariais':'Business Services','Empréstimos':'Loans & Debt',
+  'Moradia':'Housing','Transferências':'Transfers','Reembolsos':'Refunds & Credits',
+  'Renda':'Income','Saque / ATM':'Cash & ATM','Tarifas Bancárias':'Banking Fees','Outros':'Other',
+  // Hebrew
+  'אוכל ומסעדות':'Food & Dining','מכולת וסופר':'Groceries','תחבורה':'Transportation',
+  'קניות':'Shopping','בידור':'Entertainment','בריאות':'Health & Medical',
+  'חשבונות':'Utilities','מנויים ותוכנה':'Subscriptions & Software','נסיעות':'Travel',
+  'חינוך':'Education','בית וגינה':'Home & Garden','טיפוח אישי':'Personal Care',
+  'ביטוח':'Insurance','שירותים עסקיים':'Business Services','הלוואות וחובות':'Loans & Debt',
+  'דיור':'Housing','העברות':'Transfers','החזרים וזיכויים':'Refunds & Credits',
+  'הכנסה':'Income','מזומן / כספומט':'Cash & ATM','עמלות בנק':'Banking Fees','אחר':'Other',
+};
+
+function normalizeCategory(cat) {
+  if (!cat) return 'Other';
+  if (VALID_CATEGORIES.has(cat)) return cat;
+  return CAT_LOCALE_MAP[cat] || 'Other';
+}
+
 // Deterministic post-processing for Brazilian bank/credit-card transactions
 // Runs AFTER Claude parses — overrides categories for known Brazilian patterns
 function brazilPostProcess(transactions) {
@@ -324,7 +357,9 @@ function brazilPostProcess(transactions) {
     if (/quinto\s*andar|quintoandar|\bmrv\b|cyrela|helbor/.test(d))
       return { ...t, category: 'Housing' };
 
-    return t; // no match — leave AI classification as-is
+    // Normalize any translated category the AI may have returned
+    const nc = normalizeCategory(t.category);
+    return nc !== t.category ? { ...t, category: nc } : t;
   });
 }
 
@@ -405,7 +440,8 @@ function dutchPostProcess(transactions) {
     if (/netflix|spotify|disney\+|videoland|npo start|amazon prime|apple.*subscr|google.*subscr|adobe/.test(d))
       return { ...t, category: 'Subscriptions & Software' };
 
-    return t;
+    const nc = normalizeCategory(t.category);
+    return nc !== t.category ? { ...t, category: nc } : t;
   });
 }
 
@@ -479,7 +515,8 @@ function hebrewPostProcess(transactions) {
     if (/קצבת ילדים|ביטוח לאומי|גמלה/.test(d))
       return { ...t, category: 'Income' };
 
-    return t;
+    const nc = normalizeCategory(t.category);
+    return nc !== t.category ? { ...t, category: nc } : t;
   });
 }
 
