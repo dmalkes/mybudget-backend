@@ -459,21 +459,24 @@
   <div id="page-overview" class="page active max-w-2xl mx-auto px-4 py-5">
 
     <!-- Summary hero card -->
-    <div class="grad rounded-2xl p-5 mb-4 text-white fade-up" style="box-shadow:0 6px 24px rgba(99,102,241,.3)">
-      <div class="flex items-start justify-between">
-        <div>
+    <div class="grad rounded-2xl p-6 mb-4 text-white fade-up" style="box-shadow:0 6px 24px rgba(99,102,241,.3)">
+      <!-- Two-column grid: Spending | Income -->
+      <div class="grid grid-cols-2 gap-0">
+        <!-- Left: Spent this month -->
+        <div class="pr-4">
           <p class="text-white/70 text-xs font-semibold uppercase tracking-wide mb-1" data-i18n="spent_this_month">Spent this month</p>
-          <p id="heroTotal" class="text-4xl font-extrabold mb-0.5">R$0</p>
+          <p id="heroTotal" class="text-3xl font-extrabold leading-tight truncate">R$0</p>
         </div>
-        <div id="heroIncomeBox" class="text-right">
-          <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-1" data-i18n="income_label">Income</p>
-          <p id="heroIncome" class="text-4xl font-extrabold text-emerald-300 mb-1.5">R$0</p>
-          <div class="flex justify-end gap-4">
-            <div>
+        <!-- Right: Income — separated by left border -->
+        <div id="heroIncomeBox" class="pl-4 border-l border-white/20">
+          <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-1 text-right" data-i18n="income_label">Income</p>
+          <p id="heroIncome" class="text-3xl font-extrabold text-emerald-300 leading-tight text-right truncate">R$0</p>
+          <div class="flex justify-end gap-4 mt-1.5">
+            <div class="text-right">
               <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_fixed">Fixed</p>
               <p id="heroIncomeFixed" class="text-sm font-semibold text-emerald-200/80">R$0</p>
             </div>
-            <div>
+            <div class="text-right">
               <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_variable">Variable</p>
               <p id="heroIncomeVariable" class="text-sm font-semibold text-emerald-200/80">R$0</p>
             </div>
@@ -481,10 +484,10 @@
         </div>
       </div>
       <!-- Balance strip — always shown -->
-      <div id="heroBalanceRow" class="mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
+      <div id="heroBalanceRow" class="mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
         <div>
           <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="balance_label">Balance</p>
-          <p id="heroBalance" class="text-xl font-bold text-white/60">—</p>
+          <p id="heroBalance" class="text-xl font-bold text-white/40">—</p>
         </div>
         <span id="heroCount" class="text-white/50 text-xs"></span>
         <div class="flex items-center gap-2">
