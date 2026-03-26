@@ -1870,13 +1870,37 @@ function parseOFX(text) {
   return txns;
 }
 
+// Maps Nubank PDF category labels (ALL CAPS Portuguese) to app categories
+function mapNubankPDFCategory(label) {
+  const l = label.toLowerCase();
+  if (/alimenta[cç]|restaurante|lanche|bebida/i.test(l)) return 'Food & Dining';
+  if (/transporte|uber|mobilidade/i.test(l)) return 'Transportation';
+  if (/supermercado|mercado/i.test(l)) return 'Groceries';
+  if (/compras|shopping|varejo/i.test(l)) return 'Shopping';
+  if (/sa[uú]de|farm[aá]cia|higiene/i.test(l)) return 'Health & Medical';
+  if (/educa[cç]/i.test(l)) return 'Education';
+  if (/lazer|entretenimento|streaming/i.test(l)) return 'Entertainment';
+  if (/viagen|turismo|hospedagem/i.test(l)) return 'Travel';
+  if (/servi[cç]os\s*essenciais|telecomunica[cç]|internet/i.test(l)) return 'Utilities';
+  if (/assinatura/i.test(l)) return 'Subscriptions & Software';
+  if (/casa|moradia/i.test(l)) return 'Housing';
+  return null;
+}
+
 function parseNubankCC(text) {
   const yearM = text.match(/FATURA\s+\d{1,2}\s+\w+\s+(\d{4})/i);
   const year = yearM ? yearM[1] : new Date().getFullYear().toString();
   const section = text.match(/TRANSA[ÇC][OÕ]ES\s+DE[\s\S]+/i);
   if (!section) return null;
   const txns = [];
+  let currentCategory = null;
   for (const line of section[0].split('\n')) {
+    // Nubank PDF shows category headers as uppercase-only standalone lines
+    const trimmed = line.trim();
+    if (/^[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][A-ZÁÀÃÂÉÊÍÓÔÕÚÇ\s&]+$/.test(trimmed) && trimmed.length > 3 && trimmed.length < 40 && !/^\d/.test(trimmed)) {
+      const mapped = mapNubankPDFCategory(trimmed);
+      if (mapped) { currentCategory = mapped; continue; }
+    }
     const m = line.match(/^(\d{1,2})\s+([A-ZÇÃÁÉÍÓÚÂÊÔÀÜ]{3})\s+(.+?)\s+([\d.]+,\d{2})\s*$/);
     if (!m) continue;
     const mon = brMonth(m[2]); if (!mon) continue;
@@ -1884,8 +1908,8 @@ function parseNubankCC(text) {
     const amt = brAmount(m[4]); if (amt === null) continue;
     const isPagamento = /pagamento/i.test(m[3]);
     const finalAmt = isPagamento ? Math.abs(amt) : -Math.abs(amt);
-    txns.push({ date, description: m[3].trim(), amount: finalAmt,
-      category: isPagamento ? 'Transfers' : guessBrCategory(m[3], finalAmt), source: 'Nubank' });
+    const cat = isPagamento ? 'Transfers' : (currentCategory || guessBrCategory(m[3], finalAmt));
+    txns.push({ date, description: m[3].trim(), amount: finalAmt, category: cat, source: 'Nubank' });
   }
   return txns.length ? txns : null;
 }
@@ -1925,26 +1949,55 @@ function parseItauAccount(text) {
   return txns.length ? txns : null;
 }
 
+// Maps Itaú CC PDF category headers (Portuguese) to app categories
+function mapItauPDFCategory(sectionHeader) {
+  const h = sectionHeader.toLowerCase();
+  if (/alimenta[cç]|bebida|restaurante|lanche/i.test(h)) return 'Food & Dining';
+  if (/transporte|combustí|combust|posto|uber|99taxi|mobilidade/i.test(h)) return 'Transportation';
+  if (/supermercado|mercado|hipermercado|atacado/i.test(h)) return 'Groceries';
+  if (/compras|servi[cç]os|varejo|lojas/i.test(h)) return 'Shopping';
+  if (/sa[uú]de|higiene|farm[aá]cia|m[eé]dico/i.test(h)) return 'Health & Medical';
+  if (/educa[cç]|escola|curso|universidade/i.test(h)) return 'Education';
+  if (/entretenimento|lazer|cinema|teatro|streaming/i.test(h)) return 'Entertainment';
+  if (/viagen|turismo|hotel|pousada|hospedagem/i.test(h)) return 'Travel';
+  if (/seguro/i.test(h)) return 'Insurance';
+  if (/telecomunica[cç]|telefon|internet|tv/i.test(h)) return 'Utilities';
+  if (/assinatura|subscri/i.test(h)) return 'Subscriptions & Software';
+  if (/dom[eé]stico|moradia|aluguel|condom/i.test(h)) return 'Housing';
+  if (/pagamento|transfer[eê]|cr[eé]dito/i.test(h)) return 'Transfers';
+  return null; // null = fall back to guessBrCategory
+}
+
 function parseItauCC(text) {
   if (!/(itaucard|lan[çc]amentos.*compras)/i.test(text)) return null;
   const yearM = text.match(/[Vv]encimento[:\s]*\d{2}\/\d{2}\/(\d{4})/);
   const year = yearM ? yearM[1] : new Date().getFullYear().toString();
   // Pattern matches transactions in both single and two-column layouts
   const pat = /(\d{2}\/\d{2})\s+([A-Za-z][^-\d\n]*?)\s+(-\s*[\d.]+,\d{2}|[\d.]+,\d{2})/g;
+  // Category section headers: standalone lines with no date/amount, inside the section
+  const catHeaderPat = /^([A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][A-Za-záàãâéêíóôõúçÁÀÃÂÉÊÍÓÔÕÚÇ\s&]+)$/;
   const txns = [];
   let inSection = false;
+  let currentCategory = null;
   for (const line of text.split('\n')) {
     if (/Lan[çc]amentos.*compras/i.test(line)) { inSection = true; continue; }
     if (/Total dos lan[çc]amentos/i.test(line)) { inSection = false; continue; }
     if (!inSection) continue;
+    // Detect category section headers (standalone text lines, no date/amount)
+    const trimmed = line.trim();
+    if (catHeaderPat.test(trimmed) && !/\d/.test(trimmed) && trimmed.length > 3 && trimmed.length < 50) {
+      const mapped = mapItauPDFCategory(trimmed);
+      if (mapped) { currentCategory = mapped; continue; }
+    }
     let m;
     while ((m = pat.exec(line)) !== null) {
       const [dd, mm] = m[1].split('/');
       const date = `${year}-${mm}-${dd}`;
       const amt = brAmount(m[3].replace(/\s/g,'')); if (amt === null) continue;
       const finalAmt = -Math.abs(amt);
-      txns.push({ date, description: m[2].trim(), amount: finalAmt,
-        category: guessBrCategory(m[2], finalAmt), source: 'Itaucard' });
+      // Prefer PDF section category, fall back to keyword detection
+      const cat = currentCategory || guessBrCategory(m[2], finalAmt);
+      txns.push({ date, description: m[2].trim(), amount: finalAmt, category: cat, source: 'Itaucard' });
     }
     pat.lastIndex = 0; // reset for next line
   }
