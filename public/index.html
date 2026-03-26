@@ -1924,11 +1924,12 @@ function parseNubankCC(text) {
   return txns.length ? txns : null;
 }
 
-// Handle year rollover: e.g. January statement containing December transactions → use prior year
+// Handle year rollover: e.g. January due-date with December transactions → use prior year.
+// Only rolls BACKWARD — CC statements never contain future-month transactions.
 function resolveYear(baseYear, statementMonth, txnMonth) {
   const base = parseInt(baseYear), sm = parseInt(statementMonth), tm = parseInt(txnMonth);
-  if (sm <= 2 && tm >= 11) return (base - 1).toString(); // Jan/Feb statement, Nov/Dec txn
-  if (sm >= 11 && tm <= 2) return (base + 1).toString(); // Nov/Dec statement, Jan/Feb txn
+  // Statement due in Jan or Feb, but transaction is from Nov or Dec → prior year
+  if (sm <= 2 && tm >= 11) return (base - 1).toString();
   return baseYear;
 }
 
@@ -3111,9 +3112,12 @@ function deleteGoal(id) {
 }
 
 function buildFinancialContext() {
-  const spending = state.transactions.filter(t => !t._isIncome && !t._isTransfer);
-  const income = state.transactions.filter(t => t._isIncome);
-  const months = [...new Set(state.transactions.map(t => budgetMonth(t)).filter(Boolean))].sort();
+  // Exclude transactions with future dates — they indicate a parsing error and skew insights
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const validTxns = state.transactions.filter(t => t.date && t.date <= todayStr);
+  const spending = validTxns.filter(t => !t._isIncome && !t._isTransfer);
+  const income = validTxns.filter(t => t._isIncome);
+  const months = [...new Set(validTxns.map(t => budgetMonth(t)).filter(Boolean))].sort();
   const latestMonth = months.at(-1) || new Date().toISOString().slice(0, 7);
   const currency = state.onboarding?.currencySymbol || 'R$';
 

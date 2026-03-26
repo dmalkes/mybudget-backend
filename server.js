@@ -562,9 +562,12 @@ app.post('/api/parse-file', parseLimiter, async (req, res) => {
     - נטפליקס, ספוטיפיי, אפל, גוגל = Subscriptions & Software
     - שכר דירה, ועד בית = Housing` : '';
 
+    const currentYear = new Date().getFullYear();
     const brazilGuide = isBrazil ? `
 - Brazilian bank/credit-card format:
-  * Dates: DD/MM/YYYY or DD/MM (no year — infer year from statement header or surrounding context; if unknown use current year)
+  * Today's date: ${new Date().toISOString().slice(0, 10)} (use this to anchor year inference — NEVER assign a year that is in the future relative to this date)
+  * Dates: DD/MM/YYYY or DD/MM (no year — infer year from the statement header date/period; fall back to ${currentYear} only if no header date is present)
+  * IMPORTANT: if the statement shows a period like "Out/2025" or "Vencimento 15/01/2026", ALL transactions without explicit year should use that statement year, NOT the current calendar year
   * Amounts: comma decimal, period thousands (1.234,50 = 1234.50) — always output as a plain number
   * SIGN CONVENTION — expenses are NEGATIVE, income/credits are POSITIVE:
     - Credit card statements: ALL purchases are negative (you owe money). Payments to the card (PAGAMENTO) are positive.
