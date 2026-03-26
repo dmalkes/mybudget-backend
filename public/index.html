@@ -1903,10 +1903,107 @@ function parseItauCC(text) {
   return txns.length ? txns : null;
 }
 
+// Nubank CSV: "Data,Categoria,Título,Valor"
+// Amounts: positive = expense (you owe), negative = payment/refund
+function parseNubankCSV(text) {
+  const lines = text.trim().split('\n');
+  const header = lines[0].toLowerCase().replace(/\r/g, '');
+  if (!header.includes('título') && !header.includes('titulo')) return null;
+  if (!header.includes('valor') || !header.includes('data')) return null;
+  const cols = header.split(',');
+  const iDate = cols.findIndex(c => c.trim() === 'data');
+  const iDesc = cols.findIndex(c => c.trim().includes('t') && c.trim().includes('tulo'));
+  const iAmt  = cols.findIndex(c => c.trim() === 'valor');
+  const iCat  = cols.findIndex(c => c.trim().includes('categoria') || c.trim().includes('category'));
+  if (iDate < 0 || iDesc < 0 || iAmt < 0) return null;
+  const txns = [];
+  for (const raw of lines.slice(1)) {
+    const parts = raw.replace(/\r/g, '').split(',');
+    if (parts.length < 3) continue;
+    const dateStr = parts[iDate]?.trim();
+    const desc    = parts[iDesc]?.trim();
+    const amtRaw  = parts[iAmt]?.trim();
+    if (!dateStr || !desc || !amtRaw) continue;
+    // Date: YYYY-MM-DD already, or DD/MM/YYYY
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr
+      : dateStr.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+    const amt = parseFloat(amtRaw.replace(',', '.'));
+    if (isNaN(amt)) continue;
+    const catRaw = iCat >= 0 ? (parts[iCat]?.trim() || '') : '';
+    const isPagamento = /pagamento|payment/i.test(desc) || amt < 0;
+    txns.push({
+      date, description: desc,
+      amount: isPagamento ? Math.abs(amt) : -amt,
+      category: isPagamento ? 'Transfers' : mapNubankCategory(catRaw),
+      source: 'Nubank'
+    });
+  }
+  return txns.length ? txns : null;
+}
+
+function mapNubankCategory(cat) {
+  const c = cat.toLowerCase();
+  if (c.includes('alimenta')) return 'Food & Dining';
+  if (c.includes('mercado') || c.includes('supermercado')) return 'Groceries';
+  if (c.includes('transporte') || c.includes('uber') || c.includes('taxi')) return 'Transportation';
+  if (c.includes('saúde') || c.includes('saude') || c.includes('farmácia')) return 'Health & Medical';
+  if (c.includes('lazer') || c.includes('entretenimento')) return 'Entertainment';
+  if (c.includes('viagem') || c.includes('turismo')) return 'Travel';
+  if (c.includes('educação') || c.includes('educacao')) return 'Education';
+  if (c.includes('casa') || c.includes('moradia')) return 'Housing';
+  if (c.includes('serviço') || c.includes('servico')) return 'Business Services';
+  if (c.includes('compra') || c.includes('shopping')) return 'Shopping';
+  return 'Other';
+}
+
+// Inter Bank CSV: "Data;Tipo;Descrição;Valor" (semicolon, already signed)
+function parseInterCSV(text) {
+  const lines = text.trim().split('\n');
+  const header = lines[0].toLowerCase().replace(/\r/g, '');
+  if (!header.includes('inter') && !(header.includes('descri') && header.includes('tipo'))) return null;
+  // Find the actual header row (Inter sometimes has metadata rows first)
+  let headerIdx = lines.findIndex(l => /data.*descri/i.test(l));
+  if (headerIdx < 0) return null;
+  const cols = lines[headerIdx].toLowerCase().replace(/\r/g, '').split(';');
+  const iDate = cols.findIndex(c => c.trim() === 'data');
+  const iDesc = cols.findIndex(c => c.trim().includes('descri'));
+  const iAmt  = cols.findIndex(c => c.trim() === 'valor');
+  const iType = cols.findIndex(c => c.trim() === 'tipo');
+  if (iDate < 0 || iDesc < 0 || iAmt < 0) return null;
+  const txns = [];
+  for (const raw of lines.slice(headerIdx + 1)) {
+    const parts = raw.replace(/\r/g, '').split(';');
+    if (parts.length < 3) continue;
+    const dateRaw = parts[iDate]?.trim();
+    const desc    = parts[iDesc]?.trim();
+    const amtRaw  = parts[iAmt]?.trim();
+    if (!dateRaw || !desc || !amtRaw) continue;
+    const date = dateRaw.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+    const amt = brAmount(amtRaw);
+    if (amt === null) continue;
+    const tipo = iType >= 0 ? (parts[iType]?.trim() || '') : '';
+    const isIncome = amt > 0 || /recebido|receb|crédito|credito|salário|salario/i.test(tipo + desc);
+    txns.push({
+      date, description: desc, amount: amt,
+      category: isIncome ? 'Income' : /transfer|pix|ted|doc/i.test(tipo) ? 'Transfers' : 'Other',
+      source: 'Inter'
+    });
+  }
+  return txns.length ? txns : null;
+}
+
 function tryBrazilianBankParser(text) {
   if (!text) return null;
   try {
     const t = text.toLowerCase();
+    // CSV parsers first (check before PDF parsers — CSVs are cleaner)
+    if (t.includes('título') || t.includes('titulo')) {
+      const r = parseNubankCSV(text); if (r) return r;
+    }
+    if (t.includes('inter') || (t.includes('tipo') && t.includes('descrição') && text.includes(';'))) {
+      const r = parseInterCSV(text); if (r) return r;
+    }
+    // PDF parsers
     if (t.includes('nu pagamentos') || (t.includes('nubank') && t.includes('fatura')))
       return parseNubankCC(text);
     if (t.includes('bradesco') && t.includes('lançamentos'))
@@ -1915,6 +2012,7 @@ function tryBrazilianBankParser(text) {
       return parseItauAccount(text);
     if ((t.includes('itaú') || t.includes('itaucard')) && t.includes('compras e saques'))
       return parseItauCC(text);
+    // OFX (last, as it's also handled separately in extractCandidates)
     if (/<stmttrn>/i.test(text) || /OFXHEADER/i.test(text))
       return parseOFX(text);
   } catch(e) {

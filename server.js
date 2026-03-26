@@ -566,20 +566,46 @@ app.post('/api/parse-file', parseLimiter, async (req, res) => {
 - Brazilian bank/credit-card format:
   * Dates: DD/MM/YYYY or DD/MM (no year — infer year from statement header or surrounding context; if unknown use current year)
   * Amounts: comma decimal, period thousands (1.234,50 = 1234.50) — always output as a plain number
-  * PAGAMENTO FATURA / PAGAMENTO CARTÃO / PGTO FATURA = credit card bill payment → category "Transfers", positive amount
-  * PIX, TED, DOC = bank transfers → category "Transfers" (unless it is clearly a salary deposit)
-  * SAQUE / Caixa Eletrônico = ATM withdrawal → category "Cash & ATM"
-  * Tarifa, Anuidade, IOF, Juros Rotativos = bank fees → category "Banking Fees"
-  * Common Brazilian merchants:
-    - iFood, Rappi, Uber Eats, James Delivery = Food & Dining
-    - Uber, 99, Cabify = Transportation
-    - Ipiranga, Shell, BR Distribuidora = Transportation (fuel)
-    - Carrefour, Extra, Assaí, Atacadão, Pão de Açúcar = Groceries
-    - Mercado Livre, Amazon, Shopee, Americanas, Magazine Luiza = Shopping
-    - Netflix, Spotify, Disney+, Globoplay, Amazon Prime = Subscriptions & Software
-    - Vivo, TIM, Claro, Oi, NET = Utilities
-    - ENEL, CEMIG, CPFL, SABESP = Utilities
-    - Drogaria, Farmácia, Droga Raia, Drogasil = Health & Medical` : '';
+  * SIGN CONVENTION — expenses are NEGATIVE, income/credits are POSITIVE:
+    - Credit card statements: ALL purchases are negative (you owe money). Payments to the card (PAGAMENTO) are positive.
+    - Bank account statements: debits/withdrawals are negative; deposits/credits are positive.
+    - If a line has a trailing "-" (e.g. "250,00-") that means it's negative → -250.00
+    - If the PDF has a "Débito" or "D" column marker, the amount is negative.
+    - If the PDF has a "Crédito" or "C" column marker, the amount is positive.
+  * INSTALLMENTS (parcelamentos): lines like "LOJA ABC 03/12" or "LOJA ABC PARC 03 DE 12" mean installment 3 of 12.
+    - Use description like "Loja ABC (3/12)" — extract and tag normally as an expense. Each installment is a separate transaction.
+  * PAGAMENTO FATURA / PAGAMENTO CARTÃO / PGTO FATURA / PAG FATURA = credit card payment → category "Transfers", positive amount
+  * PIX ENVIADO / PIX OUT / Pix para = outgoing transfer → category "Transfers", negative
+  * PIX RECEBIDO / PIX IN / Pix de = incoming transfer → category "Transfers", positive (unless "SALÁRIO" appears → Income)
+  * TED, DOC, TEV, Transferência = bank transfers → category "Transfers"
+  * SALÁRIO / PAGAMENTO SALARIO / FOLHA DE PAGAMENTO = salary → category "Income", positive
+  * SAQUE / Caixa Eletrônico / SAQUE 24H = ATM withdrawal → category "Cash & ATM", negative
+  * Tarifa, Anuidade, IOF, Juros Rotativos, CET, Mora, Multa, CPMF = bank/card fees → category "Banking Fees", negative
+  * RENDIMENTO / Rendimento Poupança / CDB = investment interest → category "Income", positive
+  * Common Brazilian merchants and categories:
+    - iFood, Rappi, Uber Eats, James Delivery, Zee Delivery = Food & Dining
+    - McDonald's, Burguer King, Subway, Bob's, Giraffas, Habib's = Food & Dining
+    - Uber, 99, Cabify, inDriver = Transportation (rideshare)
+    - Ipiranga, Shell, BR Rede, Posto, Raízen, Auto Posto = Transportation (fuel)
+    - SPTRANS, BilheteÚnico, Metrô SP, METRO RIO, SuperVia, CPTM = Transportation (public transit)
+    - Carrefour, Extra, Assaí, Atacadão, Pão de Açúcar, GPA, Sonda, Savegnago = Groceries
+    - Hortifruti, Quitanda, Sacolão = Groceries
+    - Mercado Livre, Amazon, Shopee, Americanas, Magazine Luiza, Submarino = Shopping
+    - Renner, Riachuelo, C&A, Hering, Zara, H&M, Shein = Shopping
+    - Netflix, Spotify, Disney+, Globoplay, Amazon Prime, Apple One, Deezer = Subscriptions & Software
+    - Microsoft, Google One, iCloud, Adobe, Canva, ChatGPT, Notion = Subscriptions & Software
+    - Vivo, TIM, Claro, Oi, NET, Nextel = Utilities (telecom)
+    - ENEL, CEMIG, CPFL, SABESP, Copel, CELPE, ENERGISA = Utilities (energy/water)
+    - Drogaria, Farmácia, Droga Raia, Drogasil, Ultrafarma, Ultragenix = Health & Medical
+    - Unimed, Bradesco Saúde, SulAmérica, Amil, Hapvida, NotreDame = Insurance (health)
+    - Clínica, Hospital, Laboratório, CBHPM, Consulta = Health & Medical
+    - Casas Bahia, Ponto, Fast Shop, Kabum, Positivo = Shopping (electronics)
+    - Leroy Merlin, Telhanorte, C&C, Tok&Stok = Home & Garden
+    - Booking, Airbnb, Decolar, CVC, Latam, Azul, Gol, LATAM = Travel
+    - Uber Inter-Cities, BlaBlaCar = Travel (intercity)
+    - Escola, Faculdade, Universidade, Anhanguera, Kroton, Estácio, FGTS Ed = Education
+    - PagSeguro, Mercado Pago, PicPay, Ame Digital = Transfers (digital wallet, classify by context if possible)
+    - Boleto, DARF, IPTU, IPVA, DPVAT, Guia = Banking Fees or Utilities depending on type` : '';
 
     const netherlandsGuide = isNetherlands ? `
 - Dutch bank statement specifics:
