@@ -1044,7 +1044,7 @@ function budgetMonth(t) {
   if (t.source === 'card') {
     return (t.billingDate || t.date).slice(0, 7);
   }
-  if (t._isIncome) {
+  if (t._isIncome || t.category === 'Income') {
     const d = new Date(t.date);
     const day = d.getDate();
     const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
@@ -1283,17 +1283,25 @@ function loadStorage() {
     if (txns) {
       state.transactions = JSON.parse(txns);
       // Migration: fix known classification issues on stored transactions
+      let migrationDirty = false;
       state.transactions.forEach(t => {
         const d = t.originalDescription || t.description || '';
         // Bank HaPoalim RTL fix: ג'ייפרוג (JFrog) appears in חובה column but is income
         if (/ג.ייפרוג/i.test(d) && t.category !== 'Income') {
           t.category = 'Income';
           t.amount = Math.abs(t.amount);
+          migrationDirty = true;
         }
-        // Re-derive flags from category (catches any past misclassification)
-        t._isIncome   = t.category === 'Income';
-        t._isTransfer = t.category === 'Transfers';
+        // Re-derive flags from category (catches any past misclassification or stale flags)
+        const shouldBeIncome   = t.category === 'Income';
+        const shouldBeTransfer = t.category === 'Transfers';
+        if (t._isIncome !== shouldBeIncome || t._isTransfer !== shouldBeTransfer) {
+          t._isIncome   = shouldBeIncome;
+          t._isTransfer = shouldBeTransfer;
+          migrationDirty = true;
+        }
       });
+      if (migrationDirty) saveTransactions();
     }
     const m = localStorage.getItem(LS.MAPPINGS);
     if (m) state.customMappings = JSON.parse(m);
@@ -2561,8 +2569,9 @@ function renderDashboard() {
   const validTxns = state.transactions.filter(t => t.date && t.date <= todayStr);
   // Use category-based flags — more reliable than amount sign
   // (credit card statements return spending as positive amounts)
-  const spending = validTxns.filter(t => !t._isIncome && !t._isTransfer);
-  const credits = validTxns.filter(t => t._isIncome);
+  const spending = validTxns.filter(t => t.category !== 'Income' && t.category !== 'Transfers'
+    && !t._isIncome && !t._isTransfer);
+  const credits = validTxns.filter(t => t._isIncome || t.category === 'Income');
 
   // Fall back to most recent data month if current calendar month has no spending
   const nowMonth = new Date().toISOString().slice(0, 7);
@@ -2580,7 +2589,7 @@ function renderDashboard() {
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
   // Incoming PIX/TED (positive Transfers) count as variable income in the display
   const incomingTransfers = validTxns.filter(tx =>
-    budgetMonth(tx) === thisMonth && tx._isTransfer && tx.amount > 0
+    budgetMonth(tx) === thisMonth && (tx._isTransfer || tx.category === 'Transfers') && tx.amount > 0
   ).reduce((s, tx) => s + Math.abs(tx.amount), 0);
   const variableIncome = otherIncome + incomingTransfers;
   const totalIncome = fixedIncome + variableIncome;
@@ -3026,11 +3035,18 @@ function selectCategory(cat) {
   const txn = state.transactions.find(t => t.id === state.editingTxnId);
   if (!txn) return;
 
-  txn.category = cat;
   const applyAll = document.getElementById('catApplyAll').checked;
+  const targets = applyAll
+    ? state.transactions.filter(t => t.description === txn.description)
+    : [txn];
+
+  targets.forEach(t => {
+    t.category = cat;
+    t._isIncome   = cat === 'Income';
+    t._isTransfer = cat === 'Transfers';
+  });
 
   if (applyAll) {
-    state.transactions.filter(t => t.description === txn.description).forEach(t => t.category = cat);
     state.customMappings[txn.description] = cat;
     saveMappings();
   }
