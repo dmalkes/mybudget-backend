@@ -734,6 +734,7 @@ const LS = {
   VARIABLE: 'mybudget_variable',
   CUSTOM_CATS: 'mybudget_custom_cats',
   GOALS: 'mybudget_goals',
+  ACCOUNT_BALANCE: 'mybudget_account_balance',
   API_KEY: 'mybudget_api_key',
   LANGUAGE: 'mybudget_language'
 };
@@ -1025,7 +1026,9 @@ const state = {
   currentTab: 'overview',
   editingTxnId: null,
   selectedGoals: [],
-  selectedMethod: null
+  selectedMethod: null,
+  accountBalance: null,      // actual balance from bank statement file
+  accountBalanceDate: null   // date of that balance
 };
 
 // ─────────────────────────────────────
@@ -1324,6 +1327,8 @@ function loadStorage() {
     if (ak) state.apiKey = ak;
     const lang = localStorage.getItem(LS.LANGUAGE);
     if (lang) state.language = lang;
+    const ab = localStorage.getItem(LS.ACCOUNT_BALANCE);
+    if (ab) { const p = JSON.parse(ab); state.accountBalance = p.balance; state.accountBalanceDate = p.date; }
   } catch(e) { console.warn('Storage load error', e); }
 }
 
@@ -1333,6 +1338,11 @@ function saveOnboarding() {
 
 function saveTransactions() {
   try { localStorage.setItem(LS.TRANSACTIONS, JSON.stringify(state.transactions)); } catch(e) {}
+}
+
+function saveAccountBalance() {
+  if (state.accountBalance != null)
+    try { localStorage.setItem(LS.ACCOUNT_BALANCE, JSON.stringify({ balance: state.accountBalance, date: state.accountBalanceDate })); } catch(e) {}
 }
 
 function saveMappings() {
@@ -1825,56 +1835,91 @@ function parseBradescoCC(text) {
 // Bradesco checking account — two-column Crédito/Débito format
 // Uses running balance to determine sign: prevBalance + amt = newBalance → credit, else debit
 function parseBradescoAccount(text) {
-  if (!/(bradesco)/i.test(text)) return null;
-  // Must look like a checking account (not a CC statement)
+  if (!/bradesco/i.test(text)) return null;
   if (/lan[çc]amentos|vencimento/i.test(text)) return null;
 
-  // Extract statement year from period header e.g. "Movimentação entre: 01/12/2025 e 01/03/2026"
   const periodM = text.match(/entre[:\s]+\d{2}\/\d{2}\/(\d{4})/i);
   const defaultYear = periodM ? periodM[1] : new Date().getFullYear().toString();
 
   const txns = [];
   let prevBalance = null;
+  let lastBalance = null;
+  let lastBalanceDate = null;
+  let pendingDesc = null; // description from the line BEFORE the amount line
+  let lastDate = null;
+
+  function pushTxn(date, rawDesc, bal) {
+    if (bal === null || prevBalance === null) { prevBalance = bal; lastBalance = bal; lastBalanceDate = date; return; }
+    const finalAmt = Math.round((bal - prevBalance) * 100) / 100;
+    prevBalance = bal;
+    lastBalance = bal;
+    lastBalanceDate = date;
+    if (Math.abs(finalAmt) < 0.005) return; // skip zero-delta lines (e.g. opening balance)
+    const desc = rawDesc.trim().replace(/\s{2,}\d{5,10}$/, '').trim(); // strip trailing docto
+    const cat = guessBrCategory(desc, finalAmt);
+    txns.push({ date, description: desc, amount: finalAmt, category: cat, source: 'Bradesco',
+      _isIncome: cat === 'Income', _isTransfer: cat === 'Transfers' });
+  }
 
   for (const line of text.split('\n')) {
-    // Skip detail sub-lines (start with "DES:" or "Endereço:" etc.)
-    if (/^\s*(DES:|Endere[çc]o:|Empresa:|Agencia:|CPF:|CNPJ:)/i.test(line)) continue;
+    const l = line.trim();
+    if (!l) continue;
+    // Skip detail/header sub-lines
+    if (/^(DES:|REM:|Endere[çc]o:|Empresa:|Agencia:|CPF:|CNPJ:|Folha:|Bradesco\s|Nome:|Data:\s|Extrato\s|Data\s+Hist)/i.test(l)) continue;
+    if (/entre[:\s].*\d{2}\/\d{2}\/\d{4}/i.test(l) && !/^\d{2}\/\d{2}\/\d{4}/.test(l)) continue;
 
-    // Transaction line: DD/MM/YYYY  DESCRIPTION  [code]  AMT  BALANCE
-    // Two decimal amounts at end — first is transaction, second is running balance
-    const m = line.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(.+?)\s{2,}([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
-    if (!m) {
-      // Try simpler pattern without year (some rows omit it)
-      const m2 = line.match(/^(\d{2})\/(\d{2})\s+(.+?)\s{2,}([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
-      if (!m2) continue;
-      const [, dd, mm, desc, amtStr, balStr] = m2;
-      const amt = brAmount(amtStr); const bal = brAmount(balStr);
-      if (amt === null || bal === null) continue;
-      const year = defaultYear;
-      const date = `${year}-${mm}-${dd}`;
-      const isCredit = prevBalance !== null ? Math.abs(prevBalance + amt - bal) < 0.02 : false;
-      const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
-      prevBalance = bal;
-      const cat = guessBrCategory(desc, finalAmt);
-      const _isIncome = cat === 'Income';
-      const _isTransfer = cat === 'Transfers';
-      txns.push({ date, description: desc.trim(), amount: finalAmt, category: cat, source: 'Bradesco', _isIncome, _isTransfer });
+    // ── Pattern A: DD/MM/YYYY  [desc]  amt  bal  (date on this line) ─────────
+    const mA = l.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(.*?)\s{2,}([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
+    if (mA) {
+      const [, dd, mm, yyyy, rawDesc, amtStr, balStr] = mA;
+      const bal = brAmount(balStr);
+      if (bal === null) continue;
+      const date = `${yyyy}-${mm}-${dd}`;
+      lastDate = date;
+      // If rawDesc is just a docto number, use pendingDesc from the description line above
+      const descIsDocto = /^\d+$/.test(rawDesc.trim());
+      const desc = (descIsDocto && pendingDesc) ? pendingDesc : rawDesc;
+      pendingDesc = null;
+      // Initial balance marker (COD. LANC. 0, zero amount, no prev) — just anchor balance
+      if (prevBalance === null) { prevBalance = bal; lastBalance = bal; lastBalanceDate = date; continue; }
+      pushTxn(date, desc, bal);
       continue;
     }
-    const [, dd, mm, yyyy, desc, amtStr, balStr] = m;
-    const amt = brAmount(amtStr); const bal = brAmount(balStr);
-    if (amt === null || bal === null) continue;
-    const date = `${yyyy}-${mm}-${dd}`;
-    // Determine credit vs debit by comparing with running balance
-    const isCredit = prevBalance !== null ? Math.abs(prevBalance + amt - bal) < 0.02 : false;
-    const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
-    prevBalance = bal;
-    const cat = guessBrCategory(desc, finalAmt);
-    const _isIncome = cat === 'Income';
-    const _isTransfer = cat === 'Transfers';
-    txns.push({ date, description: desc.trim(), amount: finalAmt, category: cat, source: 'Bradesco', _isIncome, _isTransfer });
+
+    // ── Pattern B: docto  amt  bal  (no date, same day as lastDate) ──────────
+    const mB = l.match(/^(\d{4,10})\s+([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
+    if (mB && lastDate) {
+      const bal = brAmount(mB[3]);
+      if (bal === null) continue;
+      const desc = pendingDesc || 'Transação';
+      pendingDesc = null;
+      pushTxn(lastDate, desc, bal);
+      continue;
+    }
+
+    // ── Pattern C: description  docto  amt  bal  (inline, no date) ───────────
+    const mC = l.match(/^(.+?)\s{2,}(\d{4,10})\s{2,}([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/);
+    if (mC && (lastDate || prevBalance !== null)) {
+      const [, rawDesc, , , balStr] = mC;
+      const bal = brAmount(balStr);
+      if (bal === null) continue;
+      pendingDesc = null;
+      pushTxn(lastDate || (new Date().getFullYear() + '-01-01'), rawDesc, bal);
+      continue;
+    }
+
+    // ── Pending description line (no amounts) ────────────────────────────────
+    if (!/[\d.,]{4,}/.test(l) && l.length > 2) {
+      pendingDesc = l;
+    }
   }
-  return txns.length ? txns : null;
+
+  if (!txns.length) return null;
+  // Attach final account balance so the caller can store it
+  const result = txns.slice();
+  result._accountBalance = lastBalance;
+  result._accountBalanceDate = lastBalanceDate;
+  return result;
 }
 
 function parseItauAccount(text) {
@@ -2089,8 +2134,15 @@ function tryBrazilianBankParser(text) {
       return parseNubankCC(text);
     if (t.includes('bradesco') && t.includes('lançamentos'))
       return parseBradescoCC(text);
-    if (t.includes('bradesco') && (t.includes('movimentação') || t.includes('extrato') || t.includes('saldo')))
-      return parseBradescoAccount(text);
+    if (t.includes('bradesco') && (t.includes('movimentação') || t.includes('extrato') || t.includes('saldo'))) {
+      const r = parseBradescoAccount(text);
+      if (r && r._accountBalance != null) {
+        state.accountBalance = r._accountBalance;
+        state.accountBalanceDate = r._accountBalanceDate;
+        saveAccountBalance();
+      }
+      return r;
+    }
     if ((t.includes('itaú') || t.includes('itau')) && t.includes('extrato conta'))
       return parseItauAccount(text);
     if ((t.includes('itaú') || t.includes('itaucard')) && t.includes('compras e saques'))
@@ -2445,7 +2497,12 @@ function renderDashboard() {
   document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
 
   const balEl = document.getElementById('heroBalance');
-  if (totalIncome > 0 || incomingTransfers > 0) {
+  if (state.accountBalance != null) {
+    // Actual balance from bank statement — most accurate
+    balEl.textContent = fmt(state.accountBalance);
+    balEl.style.color = state.accountBalance >= 0 ? '#6ee7b7' : '#fca5a5';
+  } else if (totalIncome > 0 || incomingTransfers > 0) {
+    // Computed balance: income - spending
     const net = totalIncome + incomingTransfers - totalSpent;
     balEl.textContent = (net >= 0 ? '+' : '-') + fmt(Math.abs(net));
     balEl.style.color = net >= 0 ? '#6ee7b7' : '#fca5a5';
