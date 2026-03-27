@@ -2408,7 +2408,15 @@ function toggleFixed(txnId) {
 function renderDashboard() {
   // Exclude future-dated transactions (parsing errors — e.g. year assigned incorrectly)
   const todayStr = new Date().toISOString().slice(0, 10);
-  const validTxns = state.transactions.filter(t => t.date && t.date <= todayStr);
+  // For income, allow full current month — salary is often paid on the last working day
+  // which may be a few days in the future relative to "today"
+  const now = new Date();
+  const monthEndStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const validTxns = state.transactions.filter(t => {
+    if (!t.date) return false;
+    if (t._isIncome || t.category === 'Income') return t.date <= monthEndStr;
+    return t.date <= todayStr;
+  });
   // Use category-based flags — more reliable than amount sign
   // (credit card statements return spending as positive amounts)
   const spending = validTxns.filter(t => t.category !== 'Income' && t.category !== 'Transfers'
@@ -2655,9 +2663,14 @@ function detectSubscriptions(txns) {
 function renderBudgetPage() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const month = document.getElementById('budgetMonthFilter')?.value || new Date().toISOString().slice(0, 7);
-  const txns = state.transactions.filter(t => t.date && t.date <= todayStr && budgetMonth(t) === month);
-  const debits = txns.filter(t => !t._isIncome && !t._isTransfer);
-  const credits = txns.filter(t => t._isIncome);
+  const monthEndStr = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
+  const txns = state.transactions.filter(t => {
+    if (!t.date) return false;
+    const cutoff = (t._isIncome || t.category === 'Income') ? monthEndStr : todayStr;
+    return t.date <= cutoff && budgetMonth(t) === month;
+  });
+  const debits = txns.filter(t => !t._isIncome && !t._isTransfer && t.category !== 'Income' && t.category !== 'Transfers');
+  const credits = txns.filter(t => t._isIncome || t.category === 'Income');
 
   // Income
   const incomeByMerchant = {};
@@ -2825,7 +2838,7 @@ function filterTransactions() {
       </div>
       <div style="text-align:right;flex-shrink:0">
         <p class="font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'}">${isPositive ? '+' : '-'}${fmt(Math.abs(txn.amount))}</p>
-        <p class="text-xs text-slate-500">${tCat(txn.category)}</p>
+        <p class="text-xs font-semibold" style="color:${CAT_COLORS[txn.category]||'#9ca3af'}">${tCat(txn.category)}</p>
       </div>
       <button onclick="event.stopPropagation(); openCatModal('${txn.id}')" class="text-lg text-slate-300 hover:text-slate-600 ml-2 flex-shrink-0" title="Change category">✏</button>
       <button onclick="event.stopPropagation(); toggleFixed('${txn.id}')" class="text-xs px-1.5 py-0.5 rounded ml-1 flex-shrink-0 ${isFixed(txn) ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}" title="Toggle fixed/variable">${isFixed(txn) ? '🔒' : '🔀'}</button>
