@@ -1836,7 +1836,9 @@ function parseBradescoCC(text) {
 // Uses running balance to determine sign: prevBalance + amt = newBalance → credit, else debit
 function parseBradescoAccount(text) {
   if (!/bradesco/i.test(text)) return null;
-  if (/lan[çc]amentos|vencimento/i.test(text)) return null;
+  // Reject credit-card invoices (they have a due date / fatura) but NOT regular account statements
+  // "Últimos Lancamentos" can appear as a page header in account statements — don't block on it
+  if (/vencimento|fatura\s+de\s+cart[aã]o/i.test(text)) return null;
 
   const periodM = text.match(/entre[:\s]+\d{2}\/\d{2}\/(\d{4})/i);
   const defaultYear = periodM ? periodM[1] : new Date().getFullYear().toString();
