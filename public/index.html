@@ -288,17 +288,17 @@
 <div id="catModal">
   <div id="catModalPanel">
     <div class="flex items-center justify-between mb-4">
-      <h3 class="font-semibold text-slate-800">Change Category</h3>
+      <h3 class="font-semibold text-slate-800" data-i18n="catmodal_title">Change Category</h3>
       <button onclick="closeCatModal()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
     </div>
-    <p id="catModalMerchant" class="text-sm text-slate-500 mb-1">Merchant:</p>
+    <p id="catModalMerchant" class="text-sm text-slate-500 mb-1" data-i18n="catmodal_merchant">Merchant:</p>
     <p id="catModalMerchantName" class="font-semibold text-slate-800 mb-4"></p>
     <div id="catModalGrid" class="grid grid-cols-2 gap-2 mb-4"></div>
     <!-- Create new category -->
     <div class="border-t border-slate-100 pt-4 mb-4">
-      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Create new category</p>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2" data-i18n="catmodal_create">Create new category</p>
       <div class="flex gap-2">
-        <input id="newCatName" type="text" placeholder="Category name…" class="inp flex-1 text-sm py-1.5" maxlength="30" onkeydown="if(event.key==='Enter')createCustomCategory()">
+        <input id="newCatName" type="text" placeholder="Category name…" data-i18n="catmodal_name_placeholder" class="inp flex-1 text-sm py-1.5" maxlength="30" onkeydown="if(event.key==='Enter')createCustomCategory()">
         <div class="flex gap-1 items-center" id="newCatColors">
           <button type="button" onclick="pickNewCatColor(this,'#f97316')" class="w-5 h-5 rounded-full flex-shrink-0 ring-2 ring-transparent hover:ring-slate-300 transition-all" style="background:#f97316" title="Orange"></button>
           <button type="button" onclick="pickNewCatColor(this,'#6366f1')" class="w-5 h-5 rounded-full flex-shrink-0 ring-2 ring-transparent hover:ring-slate-300 transition-all" style="background:#6366f1" title="Indigo"></button>
@@ -313,7 +313,7 @@
     </div>
     <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
       <input type="checkbox" id="catApplyAll" checked class="w-4 h-4 rounded accent-indigo-500">
-      <span id="catApplyAllText">Apply to all transactions from this merchant</span>
+      <span id="catApplyAllText" data-i18n="catmodal_apply_all">Apply to all transactions from this merchant</span>
     </label>
   </div>
 </div>
@@ -363,10 +363,10 @@
   <!-- Header -->
   <div class="grad px-5 py-4 text-white flex-shrink-0">
     <div class="flex items-center justify-between mb-1">
-      <h2 class="text-base font-bold">Review Transactions</h2>
-      <button onclick="reviewDone()" class="text-white/60 text-sm font-semibold hover:text-white px-2 py-1">Skip →</button>
+      <h2 class="text-base font-bold" data-i18n="review_title">Review Transactions</h2>
+      <button onclick="reviewDone()" class="text-white/60 text-sm font-semibold hover:text-white px-2 py-1" data-i18n="review_skip">Skip →</button>
     </div>
-    <p id="reviewSubtitle" class="text-white/70 text-sm mb-3">AI wasn't sure about these transactions</p>
+    <p id="reviewSubtitle" class="text-white/70 text-sm mb-3"></p>
     <div class="bg-white/20 rounded-full h-1.5">
       <div id="reviewProgressBar" class="bg-white rounded-full h-1.5 transition-all duration-500" style="width:0%"></div>
     </div>
@@ -376,8 +376,8 @@
   <div id="reviewList" class="flex-1 overflow-y-auto px-4 py-3 space-y-3"></div>
   <!-- Footer -->
   <div class="flex-shrink-0 px-4 py-3 bg-white border-t border-slate-200 flex gap-3" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
-    <button onclick="reviewDone()" class="flex-1 py-3 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-500">Skip remaining</button>
-    <button onclick="reviewDone()" class="flex-1 py-3 rounded-xl grad text-white text-sm font-semibold" style="box-shadow:0 4px 14px rgba(99,102,241,.3)">Done ✓</button>
+    <button onclick="reviewDone()" class="flex-1 py-3 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-500" data-i18n="review_skip_remaining">Skip remaining</button>
+    <button onclick="reviewDone()" class="flex-1 py-3 rounded-xl grad text-white text-sm font-semibold" style="box-shadow:0 4px 14px rgba(99,102,241,.3)" data-i18n="review_done">Done ✓</button>
   </div>
 </div>
 
@@ -787,6 +787,17 @@ const STRINGS = {
     balance_trend_title: 'Balance trend', balance_as_of: 'as of',
     budget_income_hdr: '💰 Income', budget_total: 'Total',
     budget_cat_title: 'Budget by Category', budget_suggest: '✨ Suggest',
+    review_title: 'Review Transactions', review_skip: 'Skip →',
+    review_subtitle: "AI wasn't sure about these transactions",
+    review_skip_remaining: 'Skip remaining', review_done: 'Done ✓',
+    review_all_done: '✓ All done!',
+    review_progress: '{done} of {total} categorized',
+    review_needs_input: '{n} group(s) need your input',
+    review_more_cats: 'More categories →',
+    catmodal_title: 'Change Category', catmodal_merchant: 'Merchant:',
+    catmodal_create: 'Create new category',
+    catmodal_name_placeholder: 'Category name…',
+    catmodal_apply_all: 'Apply to all transactions from this merchant',
     merchants_title: 'Top merchants', merchants_all: 'All →',
     subs_title: '💳 Subscriptions', subs_manage: 'Manage →',
     subs_total_prefix: 'Total subscriptions:',
@@ -853,6 +864,17 @@ const STRINGS = {
     balance_trend_title: 'Evolução do saldo', balance_as_of: 'em',
     budget_income_hdr: '💰 Renda', budget_total: 'Total',
     budget_cat_title: 'Orçamento por Categoria', budget_suggest: '✨ Sugerir',
+    review_title: 'Revisar Transações', review_skip: 'Pular →',
+    review_subtitle: 'A IA não tinha certeza sobre essas transações',
+    review_skip_remaining: 'Pular restantes', review_done: 'Concluído ✓',
+    review_all_done: '✓ Tudo certo!',
+    review_progress: '{done} de {total} categorizados',
+    review_needs_input: '{n} grupo(s) precisam de atenção',
+    review_more_cats: 'Mais categorias →',
+    catmodal_title: 'Alterar Categoria', catmodal_merchant: 'Estabelecimento:',
+    catmodal_create: 'Criar nova categoria',
+    catmodal_name_placeholder: 'Nome da categoria…',
+    catmodal_apply_all: 'Aplicar a todas as transações deste estabelecimento',
     merchants_title: 'Principais estabelecimentos', merchants_all: 'Ver →',
     subs_title: '💳 Assinaturas', subs_manage: 'Gerenciar →',
     subs_total_prefix: 'Total de assinaturas:',
@@ -919,6 +941,17 @@ const STRINGS = {
     balance_trend_title: 'מגמת יתרה', balance_as_of: 'ליום',
     budget_income_hdr: '💰 הכנסות', budget_total: 'סה"כ',
     budget_cat_title: 'תקציב לפי קטגוריה', budget_suggest: '✨ הצע',
+    review_title: 'סקירת עסקאות', review_skip: 'דלג ←',
+    review_subtitle: 'ה-AI לא היה בטוח לגבי עסקאות אלה',
+    review_skip_remaining: 'דלג על שאר', review_done: 'סיום ✓',
+    review_all_done: '✓ הכל בסדר!',
+    review_progress: '{done} מתוך {total} סווגו',
+    review_needs_input: '{n} קבוצות צריכות טיפול',
+    review_more_cats: 'עוד קטגוריות ←',
+    catmodal_title: 'שנה קטגוריה', catmodal_merchant: 'עסק:',
+    catmodal_create: 'צור קטגוריה חדשה',
+    catmodal_name_placeholder: 'שם הקטגוריה…',
+    catmodal_apply_all: 'החל על כל העסקאות מעסק זה',
     merchants_title: 'בעלי עסקים מובילים', merchants_all: 'הכל ←',
     subs_title: '💳 מנויים', subs_manage: 'ניהול ←',
     subs_total_prefix: 'סה"כ מנויים:',
@@ -3208,48 +3241,61 @@ const REVIEW_QUICK_CATS = [
 ];
 
 let _reviewCallback = null;
-let _reviewIds = [];
+let _reviewGroups = []; // [{key, ids}] — grouped by description
 
 function showReviewModal(txnIds, onDone) {
   if (!txnIds || txnIds.length === 0) { onDone(); return; }
   _reviewCallback = onDone;
-  _reviewIds = [...txnIds];
 
-  const list = document.getElementById('reviewList');
-  list.innerHTML = txnIds.map(id => {
+  // Group by description so user only categorizes each merchant once
+  _reviewGroups = [];
+  txnIds.forEach(id => {
     const txn = state.transactions.find(t => t.id === id);
-    if (!txn) return '';
-    const origDesc = txn.originalDescription || txn.description || '';
-    const desc = txn.description || origDesc;
-    const showOrig = origDesc && origDesc !== desc && origDesc.length < 80;
-    const dateStr = txn.date
-      ? new Date(txn.date + 'T12:00:00').toLocaleDateString('en', {day:'numeric', month:'short'})
-      : '';
-    const amtStr = fmt(Math.abs(txn.amount));
-    const isNeg = txn.amount < 0;
+    if (!txn) return;
+    const key = txn.description || id;
+    const g = _reviewGroups.find(g => g.key === key);
+    if (g) g.ids.push(id);
+    else _reviewGroups.push({ key, ids: [id] });
+  });
 
+  const locale = state.language === 'Hebrew' ? 'he' : state.language === 'Portuguese' ? 'pt-BR' : 'en';
+  const list = document.getElementById('reviewList');
+  list.innerHTML = _reviewGroups.map((group, gi) => {
+    const repTxn = state.transactions.find(t => t.id === group.ids[0]);
+    if (!repTxn) return '';
+    const desc = repTxn.description || '';
+    const count = group.ids.length;
+    const totalAmt = group.ids.reduce((s, id) => {
+      const tx = state.transactions.find(t => t.id === id); return s + (tx ? tx.amount : 0);
+    }, 0);
+    const isNeg = totalAmt < 0;
+    const amtStr = fmt(Math.abs(totalAmt));
+    const dateStr = repTxn.date
+      ? new Date(repTxn.date + 'T12:00:00').toLocaleDateString(locale, {day:'numeric', month:'short'})
+      : '';
+    const countBadge = count > 1
+      ? `<span class="text-[10px] bg-indigo-100 text-indigo-600 font-semibold px-1.5 py-0.5 rounded-full ml-1.5">×${count}</span>`
+      : '';
     const catBtns = REVIEW_QUICK_CATS.map(([cat, emoji]) =>
-      `<button onclick="reviewAssignCat('${id}','${cat.replace(/'/g,"\\'")}')"` +
-      ` class="text-[11px] font-semibold py-1.5 rounded-lg text-white leading-tight transition-all active:scale-95"` +
-      ` data-review-id="${id}" data-cat="${esc(cat)}"` +
-      ` style="background:${CAT_COLORS[cat]||'#9ca3af'};opacity:0.7">` +
+      `<button onclick="reviewAssignCat(${gi},'${cat.replace(/'/g,"\\'")}')"`+
+      ` class="text-[11px] font-semibold py-1.5 rounded-lg text-white leading-tight transition-all active:scale-95"`+
+      ` data-gi="${gi}" data-cat="${esc(cat)}"`+
+      ` style="background:${CAT_COLORS[cat]||'#9ca3af'};opacity:0.7">`+
       `${emoji} ${cat.split(' ')[0]}</button>`
     ).join('');
-
-    return `<div id="review-card-${id}" class="card p-4 transition-opacity duration-300">
+    return `<div id="review-card-${gi}" class="card p-4 transition-opacity duration-300">
       <div class="flex items-start justify-between mb-3">
         <div class="min-w-0 flex-1 pr-3">
-          <p class="font-semibold text-slate-800 text-sm">${esc(desc)}</p>
-          ${showOrig ? `<p class="text-slate-400 text-xs truncate mt-0.5">${esc(origDesc)}</p>` : ''}
+          <p class="font-semibold text-slate-800 text-sm">${esc(desc)}${countBadge}</p>
           <p class="text-slate-400 text-xs mt-0.5">${dateStr}</p>
         </div>
         <div class="text-right flex-shrink-0">
-          <p class="font-bold text-sm ${isNeg ? 'text-red-600' : 'text-emerald-600'}">${isNeg ? '−' : '+'}${amtStr}</p>
-          <span id="review-badge-${id}" class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-400">Other</span>
+          <p class="font-bold text-sm ${isNeg?'text-red-600':'text-emerald-600'}">${isNeg?'−':'+'}${amtStr}</p>
+          <span id="review-badge-${gi}" class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-400">${tCat('Other')}</span>
         </div>
       </div>
       <div class="grid grid-cols-3 gap-1.5 mb-2">${catBtns}</div>
-      <button onclick="reviewOpenFull('${id}')" class="text-indigo-500 text-xs font-medium hover:text-indigo-700">More categories →</button>
+      <button onclick="reviewOpenFull(${gi})" class="text-indigo-500 text-xs font-medium hover:text-indigo-700">${t('review_more_cats')}</button>
     </div>`;
   }).join('');
 
@@ -3260,55 +3306,65 @@ function showReviewModal(txnIds, onDone) {
 }
 
 function _updateReviewProgress() {
-  const total = _reviewIds.length;
-  const remaining = _reviewIds.filter(id => {
-    const tx = state.transactions.find(t => t.id === id);
+  const total = _reviewGroups.length;
+  const remaining = _reviewGroups.filter(g => {
+    const tx = state.transactions.find(t => t.id === g.ids[0]);
     return tx && tx.category === 'Other';
   }).length;
   const done = total - remaining;
   document.getElementById('reviewProgressBar').style.width = (total > 0 ? done / total * 100 : 100) + '%';
-  document.getElementById('reviewProgressText').textContent = `${done} of ${total} categorized`;
+  document.getElementById('reviewProgressText').textContent =
+    t('review_progress').replace('{done}', done).replace('{total}', total);
   document.getElementById('reviewSubtitle').textContent = remaining === 0
-    ? '✓ All done!' : `${remaining} transaction${remaining !== 1 ? 's' : ''} need your input`;
+    ? t('review_all_done')
+    : t('review_needs_input').replace('{n}', remaining);
 }
 
-function reviewAssignCat(txnId, cat) {
-  const txn = state.transactions.find(t => t.id === txnId);
-  if (!txn) return;
-  txn.category = cat;
-  txn._isIncome   = cat === 'Income';
-  txn._isTransfer = cat === 'Transfers';
+function reviewAssignCat(gi, cat) {
+  const group = _reviewGroups[gi];
+  if (!group) return;
+  // Apply category to all transactions in the group
+  group.ids.forEach(id => {
+    const txn = state.transactions.find(t => t.id === id);
+    if (!txn) return;
+    txn.category = cat;
+    txn._isIncome   = cat === 'Income';
+    txn._isTransfer = cat === 'Transfers';
+  });
+  // Save mapping so future uploads auto-categorize this merchant
+  const repTxn = state.transactions.find(t => t.id === group.ids[0]);
+  if (repTxn) { state.customMappings[repTxn.description] = cat; saveMappings(); }
 
-  const badge = document.getElementById(`review-badge-${txnId}`);
-  if (badge) { badge.textContent = cat; badge.style.background = CAT_COLORS[cat] || '#6366f1'; badge.style.color = 'white'; }
-
-  document.querySelectorAll(`[data-review-id="${txnId}"]`).forEach(btn => {
+  const badge = document.getElementById(`review-badge-${gi}`);
+  if (badge) { badge.textContent = tCat(cat); badge.style.background = CAT_COLORS[cat] || '#6366f1'; badge.style.color = 'white'; }
+  document.querySelectorAll(`[data-gi="${gi}"]`).forEach(btn => {
     const isThis = btn.dataset.cat === cat;
     btn.style.opacity = isThis ? '1' : '0.35';
     btn.style.transform = isThis ? 'scale(1.06)' : '';
     btn.style.boxShadow = isThis ? '0 2px 8px rgba(0,0,0,.2)' : '';
   });
-
-  const card = document.getElementById(`review-card-${txnId}`);
+  const card = document.getElementById(`review-card-${gi}`);
   if (card) setTimeout(() => { card.style.opacity = '0.4'; }, 400);
   _updateReviewProgress();
 }
 
-function reviewOpenFull(txnId) {
-  state.editingTxnId = txnId;
-  const txn = state.transactions.find(t => t.id === txnId);
-  if (!txn) return;
-  document.getElementById('catModalMerchantName').textContent = txn.description;
+function reviewOpenFull(gi) {
+  const group = _reviewGroups[gi];
+  if (!group) return;
+  const repTxn = state.transactions.find(t => t.id === group.ids[0]);
+  if (!repTxn) return;
+  state.editingTxnId = repTxn.id;
+  document.getElementById('catModalMerchantName').textContent = repTxn.description;
   document.getElementById('catModalGrid').innerHTML = allCategories().map(c => {
-    const sel = c === txn.category;
-    return `<button class="cat-pill ${sel ? 'ring-2 ring-indigo-500' : ''}" style="background:${CAT_COLORS[c]||'#e5e7eb'};color:white;opacity:${sel?'1':'.6'}" onclick="reviewSelectFromFull('${txnId}','${c.replace(/'/g,"\\'")}')">` + tCat(c) + `</button>`;
+    const sel = c === repTxn.category;
+    return `<button class="cat-pill ${sel?'ring-2 ring-indigo-500':''}" style="background:${CAT_COLORS[c]||'#e5e7eb'};color:white;opacity:${sel?'1':'.6'}" onclick="reviewSelectFromFull(${gi},'${c.replace(/'/g,"\\'")}')">` + tCat(c) + `</button>`;
   }).join('');
   document.getElementById('catModal').classList.add('open');
 }
 
-function reviewSelectFromFull(txnId, cat) {
+function reviewSelectFromFull(gi, cat) {
   closeCatModal();
-  reviewAssignCat(txnId, cat);
+  reviewAssignCat(gi, cat);
 }
 
 function reviewDone() {
@@ -3316,7 +3372,7 @@ function reviewDone() {
   const modal = document.getElementById('reviewModal');
   modal.style.display = 'none';
   modal.classList.add('hidden');
-  _reviewIds = [];
+  _reviewGroups = [];
   if (_reviewCallback) { const cb = _reviewCallback; _reviewCallback = null; cb(); }
 }
 
