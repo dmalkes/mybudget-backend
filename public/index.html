@@ -469,6 +469,15 @@
       </div>
     </div>
 
+    <!-- Balance trend chart -->
+    <div id="balanceTrendCard" class="card p-4 mb-4 fade-up hidden">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-800" data-i18n="balance_trend_title">Balance trend</h3>
+        <span id="balanceTrendDate" class="text-xs text-slate-400"></span>
+      </div>
+      <canvas id="balanceTrendChart" height="60"></canvas>
+    </div>
+
     <!-- Anomaly spending alerts -->
     <div id="anomalyAlertsCard" class="card-sm p-4 mb-4 fade-up hidden" style="border-left:4px solid #f59e0b;background:#fffbeb">
       <div class="flex items-center justify-between mb-2">
@@ -526,21 +535,21 @@
   <!-- ─── PAGE: BUDGET ─── -->
   <div id="page-budget" class="page max-w-2xl mx-auto px-4 py-5">
     <div class="flex items-center justify-between mb-4 mt-4">
-      <h2 class="text-xl font-bold text-slate-800">Budget</h2>
+      <h2 class="text-xl font-bold text-slate-800" data-i18n="nav_budget">Budget</h2>
       <select id="budgetMonthFilter" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="renderBudgetPage()"></select>
     </div>
 
     <!-- Monthly income / salary -->
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="font-semibold text-slate-800">💰 Income</h3>
-        <button onclick="editIncome()" class="text-xs text-indigo-500 hover:underline">Edit</button>
+        <h3 class="font-semibold text-slate-800" data-i18n="budget_income_hdr">💰 Income</h3>
+        <button onclick="editIncome()" class="text-xs text-indigo-500 hover:underline" data-i18n="budget_edit">Edit</button>
       </div>
       <div class="space-y-3">
         <div id="monthlyIncomeList"></div>
         <div class="border-t border-slate-100 pt-3">
           <div class="flex justify-between items-center">
-            <span class="text-sm font-semibold text-slate-600">Total</span>
+            <span class="text-sm font-semibold text-slate-600" data-i18n="budget_total">Total</span>
             <span id="totalIncome" class="text-xl font-bold text-slate-800"></span>
           </div>
         </div>
@@ -549,17 +558,17 @@
 
     <!-- Fixed vs Variable split -->
     <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-slate-800 mb-4">Fixed vs Variable</h3>
+      <h3 class="font-semibold text-slate-800 mb-4" data-i18n="fv_title">Fixed vs Variable</h3>
       <div id="fvContent"></div>
     </div>
 
     <!-- Budget by category -->
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="font-semibold text-slate-800">Budget by Category</h3>
+        <h3 class="font-semibold text-slate-800" data-i18n="budget_cat_title">Budget by Category</h3>
         <div class="flex items-center gap-3">
-          <button id="suggestBudgetsBtn" onclick="suggestBudgets()" class="text-xs text-indigo-500 hover:underline">✨ Suggest</button>
-          <button onclick="addCategoryBudget()" class="text-xs text-indigo-500 hover:underline">+ Set</button>
+          <button id="suggestBudgetsBtn" onclick="suggestBudgets()" class="text-xs text-indigo-500 hover:underline" data-i18n="budget_suggest">✨ Suggest</button>
+          <button onclick="addCategoryBudget()" class="text-xs text-indigo-500 hover:underline" data-i18n="budget_set">+ Set</button>
         </div>
       </div>
       <div id="budgetList" class="space-y-3"></div>
@@ -567,7 +576,7 @@
 
     <!-- Subscriptions -->
     <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-slate-800 mb-4">🔔 Subscriptions & Software</h3>
+      <h3 class="font-semibold text-slate-800 mb-4" data-i18n="subs_title">🔔 Subscriptions & Software</h3>
       <div id="subsList" class="space-y-2"></div>
     </div>
 
@@ -775,6 +784,9 @@ const STRINGS = {
     fv_pct_budget: '% of budget',
     cat_title: 'Top categories', view_all: 'View all →',
     trend_title: 'Spending trend',
+    balance_trend_title: 'Balance trend', balance_as_of: 'as of',
+    budget_income_hdr: '💰 Income', budget_total: 'Total',
+    budget_cat_title: 'Budget by Category', budget_suggest: '✨ Suggest',
     merchants_title: 'Top merchants', merchants_all: 'All →',
     subs_title: '💳 Subscriptions', subs_manage: 'Manage →',
     subs_total_prefix: 'Total subscriptions:',
@@ -838,6 +850,9 @@ const STRINGS = {
     fv_pct_budget: '% do total',
     cat_title: 'Principais categorias', view_all: 'Ver tudo →',
     trend_title: 'Tendência de gastos',
+    balance_trend_title: 'Evolução do saldo', balance_as_of: 'em',
+    budget_income_hdr: '💰 Renda', budget_total: 'Total',
+    budget_cat_title: 'Orçamento por Categoria', budget_suggest: '✨ Sugerir',
     merchants_title: 'Principais estabelecimentos', merchants_all: 'Ver →',
     subs_title: '💳 Assinaturas', subs_manage: 'Gerenciar →',
     subs_total_prefix: 'Total de assinaturas:',
@@ -901,6 +916,9 @@ const STRINGS = {
     fv_pct_budget: '% מהסך',
     cat_title: 'קטגוריות מובילות', view_all: 'הכל ←',
     trend_title: 'מגמת הוצאות',
+    balance_trend_title: 'מגמת יתרה', balance_as_of: 'ליום',
+    budget_income_hdr: '💰 הכנסות', budget_total: 'סה"כ',
+    budget_cat_title: 'תקציב לפי קטגוריה', budget_suggest: '✨ הצע',
     merchants_title: 'בעלי עסקים מובילים', merchants_all: 'הכל ←',
     subs_title: '💳 מנויים', subs_manage: 'ניהול ←',
     subs_total_prefix: 'סה"כ מנויים:',
@@ -980,6 +998,12 @@ function applyLanguage() {
       else el.textContent = val;
     }
   });
+  // Translate sort dropdown options (can't use data-i18n on <option> easily)
+  const sortSel = document.getElementById('txnSortFilter');
+  if (sortSel) {
+    const keys = ['sort_date_desc','sort_date_asc','sort_amt_desc','sort_amt_asc'];
+    [...sortSel.options].forEach((opt, i) => { if (keys[i]) opt.textContent = t(keys[i]); });
+  }
 }
 
 function selectLanguage(btn, lang) {
@@ -1754,6 +1778,20 @@ function parseOFX(text) {
     const cat = type === 'TRANSFER' ? 'Transfers' : guessBrCategory(desc, amt);
     txns.push({ date: dateStr, description: desc, amount: amt, category: cat, source: 'OFX' });
   }
+  // Extract account balance from LEDGERBAL or AVAILBAL
+  const balSection = text.match(/<LEDGERBAL>([\s\S]*?)(?=<\/LEDGERBAL>|<[A-Z])/i) ||
+                     text.match(/<AVAILBAL>([\s\S]*?)(?=<\/AVAILBAL>|<[A-Z])/i);
+  if (balSection) {
+    const balAmt = balSection[1].match(/<BALAMT>([\d.\-]+)/i);
+    const balDt  = balSection[1].match(/<DTASOF>(\d{8})/i);
+    if (balAmt) {
+      txns._accountBalance = parseFloat(balAmt[1]);
+      if (balDt) {
+        const d = balDt[1];
+        txns._accountBalanceDate = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+      }
+    }
+  }
   return txns;
 }
 
@@ -1866,8 +1904,18 @@ function parseBradescoAccount(text) {
   for (const line of text.split('\n')) {
     const l = line.trim();
     if (!l) continue;
-    // Skip detail/header sub-lines
-    if (/^(DES:|REM:|Endere[çc]o:|Empresa:|Agencia:|CPF:|CNPJ:|Folha:|Bradesco\s|Nome:|Data:\s|Extrato\s|Data\s+Hist)/i.test(l)) continue;
+    // Skip detail/header sub-lines — but capture REM: (sender) and DES: (recipient) to enrich last txn
+    if (/^REM:/i.test(l)) {
+      const name = l.replace(/^REM:\s*/i, '').replace(/\s+\d{2}\/\d{2}$/, '').trim();
+      if (name && txns.length > 0) txns[txns.length-1].description += ' ← ' + name;
+      continue;
+    }
+    if (/^DES:/i.test(l)) {
+      const name = l.replace(/^DES:\s*/i, '').replace(/\s+\d{2}\/\d{2}$/, '').trim();
+      if (name && txns.length > 0) txns[txns.length-1].description += ' → ' + name;
+      continue;
+    }
+    if (/^(Endere[çc]o:|Empresa:|Agencia:|CPF:|CNPJ:|Folha:|Bradesco\s|Nome:|Data:\s|Extrato\s|Data\s+Hist)/i.test(l)) continue;
     if (/entre[:\s].*\d{2}\/\d{2}\/\d{4}/i.test(l) && !/^\d{2}\/\d{2}\/\d{4}/.test(l)) continue;
 
     // ── Pattern A: DD/MM/YYYY  [desc]  amt  bal  (date on this line) ─────────
@@ -2023,13 +2071,14 @@ function parseNubankCSV(text) {
     const amt = parseFloat(amtRaw.replace(',', '.'));
     if (isNaN(amt)) continue;
     const catRaw = iCat >= 0 ? (parts[iCat] || '') : '';
-    const isPagamento = /pagamento|payment/i.test(desc) || amt < 0;
-    const finalAmt = isPagamento ? Math.abs(amt) : -amt;
-    txns.push({
-      date, description: desc, amount: finalAmt,
-      category: isPagamento ? 'Transfers' : (mapNubankCategory(catRaw) ?? guessBrCategory(desc, finalAmt)),
-      source: 'Nubank'
-    });
+    const isCredit = amt < 0; // negative in Nubank CSV = credit/refund coming in
+    const isPagamento = /pagamento|payment/i.test(desc);
+    const finalAmt = isCredit ? Math.abs(amt) : -Math.abs(amt);
+    let cat;
+    if (isPagamento) cat = 'Transfers';
+    else if (isCredit && /estorno|reembolso|devolu/i.test(desc)) cat = 'Refunds & Credits';
+    else cat = mapNubankCategory(catRaw) ?? guessBrCategory(desc, finalAmt);
+    txns.push({ date, description: desc, amount: finalAmt, category: cat, source: 'Nubank' });
   }
   return txns.length ? txns : null;
 }
@@ -2150,12 +2199,106 @@ function tryBrazilianBankParser(text) {
     if ((t.includes('itaú') || t.includes('itaucard')) && t.includes('compras e saques'))
       return parseItauCC(text);
     // OFX (last, as it's also handled separately in extractCandidates)
-    if (/<stmttrn>/i.test(text) || /OFXHEADER/i.test(text))
-      return parseOFX(text);
+    if (/<stmttrn>/i.test(text) || /OFXHEADER/i.test(text)) {
+      const r = parseOFX(text);
+      if (r._accountBalance != null) {
+        state.accountBalance = r._accountBalance;
+        state.accountBalanceDate = r._accountBalanceDate;
+        saveAccountBalance();
+      }
+      return r;
+    }
+    // Israeli bank: Bank HaPoalim PDF
+    if (/bankhapoalim|בנק\s*הפועלים/i.test(text)) {
+      const r = parseHaPoalimAccount(text);
+      if (r && r._accountBalance != null) {
+        state.accountBalance = r._accountBalance;
+        state.accountBalanceDate = r._accountBalanceDate;
+        saveAccountBalance();
+      }
+      return r;
+    }
   } catch(e) {
-    console.warn('Brazilian bank parser error:', e);
+    console.warn('Bank parser error:', e);
   }
   return null;
+}
+
+// ─────────────────────────────────────
+// BANK HAPOALIM (Israeli) PDF PARSER
+// ─────────────────────────────────────
+function guessHebrewCategory(desc, amount) {
+  // Known employers → Income
+  if (/ג.ייפרוג|jfrog/i.test(desc)) return 'Income';
+  if (/פאפאיה|papaya/i.test(desc)) return 'Income';
+  // National insurance / government benefits
+  if (/קצבת\s*ילדים|ביטוח\s*לאומי|מל["׳]ל|מוסד\s*לביטוח|קצבת\s*זקנה|גמלת|דמי\s*לידה|דמי\s*אבהות|דמי\s*אבטלה|מענק/i.test(desc)) return 'Income';
+  // Salary / payroll keywords
+  if (/משכורת|שכר\s*עבודה|שכר|פיצוי|בונוס|תגמול|זכות\s*שכר|תשלום\s*שכר/i.test(desc)) return amount > 0 ? 'Income' : 'Transfers';
+  // Credit card companies → Transfers (monthly bill payment)
+  if (/ישראכרט|כרטיסי\s*אשראי|מקס\s|כאל\b|דיינרס|אמריקן\s*אקספרס|ויזה\s*cal|אלבר\s*קרדיט/i.test(desc)) return 'Transfers';
+  // Loans (principal or interest) → Banking Fees
+  if (/הלוא|הלו'|קרן.*הלו|רבית/i.test(desc)) return 'Banking Fees';
+  // Banker's cheques
+  if (/שיק\s*בנקאי|ש\.\s*בנקאי/i.test(desc)) return 'Transfers';
+  // Cash / ATM
+  if (/משיכה|מזומן|בנקט|כספומט/i.test(desc)) return 'Cash & ATM';
+  // Bank fees
+  if (/עמלת|דמי\s*ניהול|דירקט/i.test(desc)) return 'Banking Fees';
+  // Transfers / standing orders / credits
+  if (/העברה|פיקדון|זיכוי|חיוב|הו"ק|הוראת\s*קבע/i.test(desc)) return 'Transfers';
+  // Default: unknown credits = Transfers (safer than Income), unknown debits = Other
+  return amount > 0 ? 'Transfers' : 'Other';
+}
+
+function parseHaPoalimAccount(text) {
+  if (!/bankhapoalim|בנק\s*הפועלים/i.test(text)) return null;
+  const txns = [];
+  let firstBalance = null;
+  let firstBalanceDate = null;
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i] !== '##') { i++; continue; }
+    i++;
+    if (i >= lines.length) break;
+
+    // Data line: ₪{balance} {amount} {description} {DD/MM/YYYY}
+    const txLine = lines[i];
+    const m = txLine.match(/[₪]?([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+(.+?)\s+(\d{2}\/\d{2}\/\d{4})\s*$/);
+    if (!m) { i++; continue; }
+
+    const bal = parseFloat(m[1].replace(/,/g, ''));
+    const amt = parseFloat(m[2].replace(/,/g, ''));
+    const desc = m[3].trim();
+    const [dd, mm, yyyy] = m[4].split('/');
+    const date = `${yyyy}-${mm}-${dd}`;
+    i++;
+
+    // Credit/debit code: 1=credit (זכות), 2=debit (חובה)
+    let code = 2;
+    if (i < lines.length && /^[12]$/.test(lines[i])) { code = parseInt(lines[i]); i++; }
+
+    if (isNaN(bal) || isNaN(amt)) continue;
+    const signedAmt = code === 1 ? Math.abs(amt) : -Math.abs(amt);
+
+    // First entry (newest) = current account balance
+    if (firstBalance === null) { firstBalance = bal; firstBalanceDate = date; }
+
+    const cat = guessHebrewCategory(desc, signedAmt);
+    txns.push({
+      date, description: desc, amount: signedAmt, category: cat,
+      source: 'Bank HaPoalim',
+      _isIncome: cat === 'Income', _isTransfer: cat === 'Transfers'
+    });
+  }
+
+  if (!txns.length) return null;
+  const result = txns.slice();
+  result._accountBalance = firstBalance;
+  result._accountBalanceDate = firstBalanceDate;
+  return result;
 }
 
 // FILE PROCESSING — parallel-ready
@@ -2174,6 +2317,11 @@ async function extractCandidates(file) {
   } else if (name.endsWith('.ofx') || name.endsWith('.qfx')) {
     rawText = await file.text();
     const result = parseOFX(rawText);
+    if (result._accountBalance != null) {
+      state.accountBalance = result._accountBalance;
+      state.accountBalanceDate = result._accountBalanceDate;
+      saveAccountBalance();
+    }
     if (result.length) return result;
   } else if (name.endsWith('.pdf')) {
     rawText = await extractPDFText(file);
@@ -2532,6 +2680,9 @@ function renderDashboard() {
 
   renderCategoryChart(catSums);
 
+  // Balance trend chart
+  renderBalanceTrend();
+
   // Monthly chart
   renderMonthlyChart(spending);
 
@@ -2683,6 +2834,88 @@ function renderMonthlyChart(spending) {
       scales: { y: { ticks: { callback: v => fmt(v) }, grid: { color: 'rgba(0,0,0,.04)' } } }
     }
   });
+}
+
+function renderBalanceTrend() {
+  const card = document.getElementById('balanceTrendCard');
+  if (!card) return;
+
+  // Need at least a few transactions with dates to build a trend
+  const allTxns = state.transactions.filter(t => t.date).sort((a, b) => a.date.localeCompare(b.date));
+  if (allTxns.length < 3) { card.classList.add('hidden'); return; }
+
+  // Keep last 90 days
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  // Daily net delta: sum all transaction amounts per day
+  const dailyDelta = {};
+  for (const tx of allTxns) {
+    if (tx.date >= cutoffStr) dailyDelta[tx.date] = (dailyDelta[tx.date] || 0) + tx.amount;
+  }
+  const dates = Object.keys(dailyDelta).sort();
+  if (dates.length < 2) { card.classList.add('hidden'); return; }
+
+  // Build balance series
+  let points;
+  if (state.accountBalance != null) {
+    // Reconstruct backwards from known current balance
+    let bal = state.accountBalance;
+    const rev = [...dates].reverse();
+    const map = {};
+    for (const d of rev) { map[d] = bal; bal -= (dailyDelta[d] || 0); }
+    points = dates.map(d => ({ x: d, y: map[d] }));
+  } else {
+    // Relative: accumulate forward from 0
+    let bal = 0;
+    points = dates.map(d => { bal += dailyDelta[d] || 0; return { x: d, y: bal }; });
+  }
+
+  card.classList.remove('hidden');
+  const ctx = document.getElementById('balanceTrendChart')?.getContext('2d');
+  if (!ctx) return;
+  if (state.charts.balanceTrend) { state.charts.balanceTrend.destroy(); state.charts.balanceTrend = null; }
+
+  const lastVal = points[points.length - 1]?.y ?? 0;
+  const lineColor = lastVal >= 0 ? '#10b981' : '#ef4444';
+  const locale = state.language === 'Hebrew' ? 'he' : state.language === 'Portuguese' ? 'pt-BR' : 'en';
+
+  state.charts.balanceTrend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map(p => p.x),
+      datasets: [{
+        data: points.map(p => p.y),
+        borderColor: lineColor,
+        backgroundColor: lineColor + '18',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => fmt(c.parsed.y), title: ts => new Date(ts[0] + 'T12:00').toLocaleDateString(locale, {day:'numeric',month:'short'}) } }
+      },
+      scales: {
+        x: {
+          ticks: { maxTicksLimit: 5, font: { size: 10 }, callback: (v, i) => { const d = points[i]?.x; return d ? new Date(d + 'T12:00').toLocaleDateString(locale, {month:'short', day:'numeric'}) : ''; } },
+          grid: { display: false }
+        },
+        y: { ticks: { font: { size: 10 }, callback: v => fmt(v) }, grid: { color: '#f1f5f9' } }
+      }
+    }
+  });
+
+  const dateEl = document.getElementById('balanceTrendDate');
+  if (dateEl) {
+    dateEl.textContent = state.accountBalanceDate
+      ? t('balance_as_of') + ' ' + new Date(state.accountBalanceDate + 'T12:00').toLocaleDateString(locale, {day:'numeric', month:'short', year:'numeric'})
+      : '';
+  }
 }
 
 function renderTopMerchants(txns, isCurrentMonth) {
