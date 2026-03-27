@@ -455,12 +455,19 @@
         </div>
         <!-- Right: Monthly spend (big) -->
         <div class="pl-4 flex flex-col justify-center text-right">
-          <p class="text-white/70 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="spent_this_month">Spent this month</p>
+          <p id="heroSpentLabel" class="text-white/70 text-[10px] font-semibold uppercase tracking-wide mb-0.5">Spent this month</p>
           <p id="heroTotal" class="text-3xl font-extrabold leading-tight truncate">R$0</p>
         </div>
       </div>
+      <!-- Date range filter -->
+      <div class="mt-3 pt-3 border-t border-white/20 flex items-center gap-2">
+        <span class="text-white/40 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0" data-i18n="hero_period">Period</span>
+        <select id="heroFromMonth" onchange="heroClampRange()" style="flex:1;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;border-radius:8px;font-size:.7rem;font-weight:600;padding:4px 6px;cursor:pointer;outline:none;min-width:0"></select>
+        <span class="text-white/40 text-xs flex-shrink-0">→</span>
+        <select id="heroToMonth" onchange="heroClampRange()" style="flex:1;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;border-radius:8px;font-size:.7rem;font-weight:600;padding:4px 6px;cursor:pointer;outline:none;min-width:0"></select>
+      </div>
       <!-- Bottom strip -->
-      <div class="mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
+      <div class="mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
         <span id="heroCount" class="text-white/50 text-xs"></span>
         <div class="flex items-center gap-2">
           <button onclick="switchTab('budget')" class="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">💼 Budget →</button>
@@ -784,6 +791,7 @@ const STRINGS = {
     fv_pct_budget: '% of budget',
     cat_title: 'Top categories', view_all: 'View all →',
     trend_title: 'Spending trend',
+    hero_period: 'Period', spent_in_period: 'Spent in period',
     balance_trend_title: 'Balance trend', balance_as_of: 'as of',
     budget_income_hdr: '💰 Income', budget_total: 'Total',
     budget_cat_title: 'Budget by Category', budget_suggest: '✨ Suggest',
@@ -861,6 +869,7 @@ const STRINGS = {
     fv_pct_budget: '% do total',
     cat_title: 'Principais categorias', view_all: 'Ver tudo →',
     trend_title: 'Tendência de gastos',
+    hero_period: 'Período', spent_in_period: 'Gasto no período',
     balance_trend_title: 'Evolução do saldo', balance_as_of: 'em',
     budget_income_hdr: '💰 Renda', budget_total: 'Total',
     budget_cat_title: 'Orçamento por Categoria', budget_suggest: '✨ Sugerir',
@@ -938,6 +947,7 @@ const STRINGS = {
     fv_pct_budget: '% מהסך',
     cat_title: 'קטגוריות מובילות', view_all: 'הכל ←',
     trend_title: 'מגמת הוצאות',
+    hero_period: 'תקופה', spent_in_period: 'הוצאות בתקופה',
     balance_trend_title: 'מגמת יתרה', balance_as_of: 'ליום',
     budget_income_hdr: '💰 הכנסות', budget_total: 'סה"כ',
     budget_cat_title: 'תקציב לפי קטגוריה', budget_suggest: '✨ הצע',
@@ -2640,52 +2650,90 @@ function toggleFixed(txnId) {
 // ─────────────────────────────────────
 // RENDERING
 // ─────────────────────────────────────
+function heroClampRange() {
+  const from = document.getElementById('heroFromMonth');
+  const to   = document.getElementById('heroToMonth');
+  if (from && to && from.value > to.value) to.value = from.value;
+  renderDashboard();
+}
+
 function renderDashboard() {
-  // Exclude future-dated transactions (parsing errors — e.g. year assigned incorrectly)
-  const todayStr = new Date().toISOString().slice(0, 10);
-  // For income, allow full current month — salary is often paid on the last working day
-  // which may be a few days in the future relative to "today"
-  const now = new Date();
+  const todayStr    = new Date().toISOString().slice(0, 10);
+  const now         = new Date();
   const monthEndStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const locale      = state.language === 'Hebrew' ? 'he' : state.language === 'Portuguese' ? 'pt-BR' : 'en';
+
   const validTxns = state.transactions.filter(t => {
     if (!t.date) return false;
     if (t._isIncome || t.category === 'Income') return t.date <= monthEndStr;
     return t.date <= todayStr;
   });
-  // Use category-based flags — more reliable than amount sign
-  // (credit card statements return spending as positive amounts)
-  const spending = validTxns.filter(t => t.category !== 'Income' && t.category !== 'Transfers'
-    && !t._isIncome && !t._isTransfer);
-  const credits = validTxns.filter(t => t._isIncome || t.category === 'Income');
+  const spending = validTxns.filter(t => !t._isIncome && !t._isTransfer
+    && t.category !== 'Income' && t.category !== 'Transfers');
+  const credits  = validTxns.filter(t => t._isIncome || t.category === 'Income');
 
-  // Fall back to most recent data month if current calendar month has no spending
-  const nowMonth = new Date().toISOString().slice(0, 7);
+  // All months with spending data, sorted ascending
+  const nowMonth    = now.toISOString().slice(0, 7);
   const spendMonths = [...new Set(spending.map(t => budgetMonth(t)).filter(Boolean))].sort();
-  const thisMonth = spendMonths.includes(nowMonth) ? nowMonth : (spendMonths.at(-1) || nowMonth);
-  const thisMonthTxns = spending.filter(t => budgetMonth(t) === thisMonth);
-  const thisMonthIncome = credits.filter(t => budgetMonth(t) === thisMonth);
+  const defaultMonth = spendMonths.includes(nowMonth) ? nowMonth : (spendMonths.at(-1) || nowMonth);
 
-  const totalSpent = thisMonthTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+  // Populate hero range selects — preserve previous selection if still valid
+  const fromSel = document.getElementById('heroFromMonth');
+  const toSel   = document.getElementById('heroToMonth');
+  if (fromSel && spendMonths.length) {
+    const prevFrom = fromSel.value;
+    const prevTo   = toSel.value;
+    const opts = spendMonths.map(m =>
+      `<option value="${m}">${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
+    ).join('');
+    fromSel.innerHTML = opts;
+    toSel.innerHTML   = opts;
+    fromSel.value = spendMonths.includes(prevFrom) ? prevFrom : defaultMonth;
+    toSel.value   = spendMonths.includes(prevTo)   ? prevTo   : defaultMonth;
+    if (fromSel.value > toSel.value) toSel.value = fromSel.value;
+  }
 
-  // Income breakdown: pure income (salary + other) separated from incoming transfers
-  const totalIncome = thisMonthIncome.reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  // Incoming PIX/TED/transfers (positive Transfers category) shown separately
-  const incomingTransfers = validTxns.filter(tx =>
-    budgetMonth(tx) === thisMonth && (tx._isTransfer || tx.category === 'Transfers') && tx.amount > 0
-  ).reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const selectedFrom = fromSel?.value || defaultMonth;
+  const selectedTo   = toSel?.value   || defaultMonth;
+  const multiMonth   = selectedFrom !== selectedTo;
 
-  document.getElementById('heroTotal').textContent = fmt(totalSpent);
-  document.getElementById('heroIncome').textContent = fmt(totalIncome);
-  document.getElementById('heroTransferIn').textContent = fmt(incomingTransfers);
-  document.getElementById('heroCount').textContent = `${thisMonthTxns.length} ${t('hero_txns')}`;
+  // Update "Spent" label
+  const spentLabel = document.getElementById('heroSpentLabel');
+  if (spentLabel) {
+    if (multiMonth) {
+      spentLabel.textContent = t('spent_in_period');
+    } else {
+      const label = new Date(selectedFrom + '-01').toLocaleDateString(locale, {month:'short', year:'numeric'});
+      spentLabel.textContent = label;
+    }
+  }
 
+  // Filter data to selected range
+  const rangeTxns = spending.filter(t => {
+    const m = budgetMonth(t); return m >= selectedFrom && m <= selectedTo;
+  });
+  const rangeIncome = credits.filter(t => {
+    const m = budgetMonth(t); return m >= selectedFrom && m <= selectedTo;
+  });
+  const totalSpent       = rangeTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalIncome      = rangeIncome.reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const incomingTransfers = validTxns.filter(tx => {
+    const m = budgetMonth(tx);
+    return m >= selectedFrom && m <= selectedTo
+      && (tx._isTransfer || tx.category === 'Transfers') && tx.amount > 0;
+  }).reduce((s, tx) => s + Math.abs(tx.amount), 0);
+
+  document.getElementById('heroTotal').textContent       = fmt(totalSpent);
+  document.getElementById('heroIncome').textContent      = fmt(totalIncome);
+  document.getElementById('heroTransferIn').textContent  = fmt(incomingTransfers);
+  document.getElementById('heroCount').textContent       = `${rangeTxns.length} ${t('hero_txns')}`;
+
+  // Balance: always current (unaffected by range)
   const balEl = document.getElementById('heroBalance');
   if (state.accountBalance != null) {
-    // Actual balance from bank statement — most accurate
-    balEl.textContent = fmt(state.accountBalance);
-    balEl.style.color = state.accountBalance >= 0 ? '#6ee7b7' : '#fca5a5';
+    balEl.textContent  = fmt(state.accountBalance);
+    balEl.style.color  = state.accountBalance >= 0 ? '#6ee7b7' : '#fca5a5';
   } else if (totalIncome > 0 || incomingTransfers > 0) {
-    // Computed balance: income - spending
     const net = totalIncome + incomingTransfers - totalSpent;
     balEl.textContent = (net >= 0 ? '+' : '-') + fmt(Math.abs(net));
     balEl.style.color = net >= 0 ? '#6ee7b7' : '#fca5a5';
@@ -2695,56 +2743,48 @@ function renderDashboard() {
   }
   renderAnomalyAlerts();
 
-  // Category chart (exclude Refunds & Credits)
+  // Category chart — follows range
   const catSums = {};
-  thisMonthTxns.filter(t => t.category !== 'Refunds & Credits').forEach(t => {
+  rangeTxns.filter(t => t.category !== 'Refunds & Credits').forEach(t => {
     catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
-
-  // Populate the month filter dropdown for the category chart
   const catMonthSel = document.getElementById('catChartMonthFilter');
   if (catMonthSel) {
-    const locale = state.language === 'Hebrew' ? 'he' : state.language === 'Portuguese' ? 'pt-BR' : 'en';
     catMonthSel.innerHTML = spendMonths.slice().reverse().map(m =>
-      `<option value="${m}" ${m === thisMonth ? 'selected' : ''}>${new Date(m + '-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
+      `<option value="${m}" ${m === selectedTo ? 'selected' : ''}>${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
     ).join('');
-    catMonthSel.value = thisMonth; // force correct selection on iOS Safari (selected attr in dynamic innerHTML is unreliable)
+    catMonthSel.value = selectedTo;
   }
-
   renderCategoryChart(catSums);
-
-  // Balance trend chart
   renderBalanceTrend();
-
-  // Monthly chart
   renderMonthlyChart(spending);
 
-  // Fixed vs Variable
-  const fixedSum = thisMonthTxns.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const variableSum = thisMonthTxns.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const fvHtml = `<div class="fv-bar mb-2">
-    <div style="flex:${fixedSum};background:#6366f1"></div>
-    <div style="flex:${variableSum};background:#f59e0b"></div>
-  </div>
-  <div class="flex justify-between text-xs">
-    <span class="text-indigo-500 font-semibold">${t('fv_fixed')} ${fmt(fixedSum)}</span>
-    <span class="text-amber-600 font-semibold">${t('fv_variable')} ${fmt(variableSum)}</span>
-  </div>`;
-  document.getElementById('overviewFvBar').innerHTML = fvHtml;
+  // Fixed vs Variable — follows range
+  const fixedSum    = rangeTxns.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const variableSum = rangeTxns.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  document.getElementById('overviewFvBar').innerHTML =
+    `<div class="fv-bar mb-2">
+      <div style="flex:${fixedSum};background:#6366f1"></div>
+      <div style="flex:${variableSum};background:#f59e0b"></div>
+    </div>
+    <div class="flex justify-between text-xs">
+      <span class="text-indigo-500 font-semibold">${t('fv_fixed')} ${fmt(fixedSum)}</span>
+      <span class="text-amber-600 font-semibold">${t('fv_variable')} ${fmt(variableSum)}</span>
+    </div>`;
 
-  // Top merchants
-  renderTopMerchants(thisMonthTxns, true);
-
-  // Subscriptions
-  const subs = detectSubscriptions(thisMonthTxns);
+  // Top merchants + subscriptions — follow range
+  renderTopMerchants(rangeTxns, true);
+  const subs = detectSubscriptions(rangeTxns);
   if (subs.length > 0) {
     document.getElementById('subsCard').classList.remove('hidden');
-    const subsHtml = subs.map(s => `<div class="flex justify-between items-center py-2 border-b border-slate-100 last:border-none">
-      <span class="text-sm text-slate-700">${s.name}</span>
-      <span class="text-sm font-semibold text-slate-800">${fmt(s.amount)}</span>
-    </div>`).join('');
-    document.getElementById('subsPreview').innerHTML = subsHtml;
-    document.getElementById('subsTotal').textContent = `${t('subs_total_prefix')} ${fmt(subs.reduce((s, x) => s + x.amount, 0))}/month`;
+    document.getElementById('subsPreview').innerHTML = subs.map(s =>
+      `<div class="flex justify-between items-center py-2 border-b border-slate-100 last:border-none">
+        <span class="text-sm text-slate-700">${s.name}</span>
+        <span class="text-sm font-semibold text-slate-800">${fmt(s.amount)}</span>
+      </div>`
+    ).join('');
+    document.getElementById('subsTotal').textContent =
+      `${t('subs_total_prefix')} ${fmt(subs.reduce((s, x) => s + x.amount, 0))}/month`;
   }
   applyLanguage();
 }
