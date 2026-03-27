@@ -3320,8 +3320,8 @@ function showReviewModal(txnIds, onDone) {
       `<button onclick="reviewAssignCat(${gi},'${cat.replace(/'/g,"\\'")}')"`+
       ` class="text-[11px] font-semibold py-1.5 rounded-lg text-white leading-tight transition-all active:scale-95"`+
       ` data-gi="${gi}" data-cat="${esc(cat)}"`+
-      ` style="background:${CAT_COLORS[cat]||'#9ca3af'};opacity:0.7">`+
-      `${emoji} ${cat.split(' ')[0]}</button>`
+      ` style="background:${CAT_COLORS[cat]||'#9ca3af'};opacity:0.7;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">`+
+      `${emoji} ${tCat(cat)}</button>`
     ).join('');
     return `<div id="review-card-${gi}" class="card p-4 transition-opacity duration-300">
       <div class="flex items-start justify-between mb-3">
