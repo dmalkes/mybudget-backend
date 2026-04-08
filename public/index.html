@@ -3472,7 +3472,6 @@ function renderBalanceTrend() {
 
   const lastVal = points[points.length - 1]?.y ?? 0;
   const lineColor = lastVal >= 0 ? '#10b981' : '#ef4444';
-  const locale = 'pt-BR';
   const yVals = points.map(p => p.y);
   const yMin = Math.min(...yVals);
   const yMax = Math.max(...yVals);
