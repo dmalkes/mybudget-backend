@@ -1493,6 +1493,32 @@ function loadStorage() {
         if (t.amount > 0 && /משכורת|שכר עבודה|שכר|פיצוי|בונוס|תגמול/i.test(d) && t.category !== 'Income') {
           t.category = 'Income'; migrationDirty = true;
         }
+        // Fix raw Pluggy categories that weren't mapped in earlier versions
+        if (t.source === 'Pluggy') {
+          const pluggyRawFix = {
+            'Credit card payment':      'Transfers',
+            'Credit Card Payment':      'Transfers',
+            'Same person transfer':     'Transfers',
+            'Same Person Transfer':     'Transfers',
+            'Mileage programs':         'Travel',
+            'Mileage Programs':         'Travel',
+            'Airport and airlines':     'Travel',
+            'Airport and Airlines':     'Travel',
+            'Airlines':                 'Travel',
+            'Clothing':                 'Shopping',
+            'Clothing and Accessories': 'Shopping',
+            'Taxes':                    'Other',
+            'Loan':                     'Loans & Debt',
+            'Loans':                    'Loans & Debt',
+            'Refund':                   'Refunds & Credits',
+            'Cashback':                 'Refunds & Credits',
+          };
+          if (pluggyRawFix[t.category]) { t.category = pluggyRawFix[t.category]; migrationDirty = true; }
+          // "Estorno de compra" / "Crédito de X" (positive) = refund, not spending
+          if (t.amount > 0 && /estorno|cr[eé]dito\s*de/i.test(t.description || '')) {
+            t.category = 'Refunds & Credits'; migrationDirty = true;
+          }
+        }
         // Re-derive flags from category (catches any past misclassification or stale flags)
         const shouldBeIncome   = t.category === 'Income';
         const shouldBeTransfer = t.category === 'Transfers';
@@ -2157,11 +2183,35 @@ function mapPluggyCategory(pluggyCat) {
     'Insurance':            'Insurance',
     'Housing':              'Housing',
     'Home':                 'Home & Garden',
-    'Subscription':         'Subscriptions & Software',
-    'Subscriptions':        'Subscriptions & Software',
-    'Personal Care':        'Personal Care',
-    'Others':               'Other',
-    'Other':                'Other',
+    'Subscription':              'Subscriptions & Software',
+    'Subscriptions':             'Subscriptions & Software',
+    'Personal Care':             'Personal Care',
+    'Credit card payment':       'Transfers',
+    'Credit Card Payment':       'Transfers',
+    'Same person transfer':      'Transfers',
+    'Same Person Transfer':      'Transfers',
+    'Transfers':                 'Transfers',
+    'Mileage programs':          'Travel',
+    'Mileage Programs':          'Travel',
+    'Airport and airlines':      'Travel',
+    'Airport and Airlines':      'Travel',
+    'Airlines':                  'Travel',
+    'Clothing':                  'Shopping',
+    'Clothing and Accessories':  'Shopping',
+    'Taxes':                     'Other',
+    'Tax':                       'Other',
+    'Loan':                      'Loans & Debt',
+    'Loans':                     'Loans & Debt',
+    'Investments':               'Income',
+    'Dividends':                 'Income',
+    'Withdrawal':                'Cash & ATM',
+    'ATM':                       'Cash & ATM',
+    'Cash':                      'Cash & ATM',
+    'Refund':                    'Refunds & Credits',
+    'Refunds':                   'Refunds & Credits',
+    'Cashback':                  'Refunds & Credits',
+    'Others':                    'Other',
+    'Other':                     'Other',
   };
   return map[pluggyCat] || null;
 }
@@ -2173,9 +2223,9 @@ function guessBrCategory(desc, amount) {
   if (amount > 0) {
     if (/sal[aá]rio|folha\s*pgto|pagto.*sal/i.test(d)) return 'Income';
     if (/rendimento|juros\s*(cr[eé]d|poup)|dividendo|\bcdb\b|lci|lca/i.test(d)) return 'Income';
-    if (/estorno|reembolso|devolu[cç]/i.test(d)) return 'Refunds & Credits';
-    if (/pix|ted\b|doc\b|transfer[eê]ncia/i.test(d)) return 'Transfers';
-    return 'Income';
+    if (/estorno|reembolso|devolu[cç]|cr[eé]dito\s*de/i.test(d)) return 'Refunds & Credits';
+    if (/pix|ted\b|doc\b|transfer[eê]ncia|recebido|pagamento\s*receb/i.test(d)) return 'Transfers';
+    return 'Other';   // unrecognised positive → not assumed Income (isTransfer logic will catch Pluggy credits)
   }
   if (/pix\s*(enviad|para\b)|ted\b|doc\b|transfer[eê]ncia|transf\b/i.test(d)) return 'Transfers';
   if (/saque|caixa\s*eletr/i.test(d)) return 'Cash & ATM';
@@ -3133,7 +3183,7 @@ function renderDashboard() {
   const rangeIncome = credits.filter(t => {
     const m = budgetMonth(t); return m >= selectedFrom && m <= selectedTo;
   });
-  const totalSpent       = rangeTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalSpent       = rangeTxns.reduce((s, t) => s + (t.amount < 0 ? -t.amount : 0), 0);
   const totalIncome      = rangeIncome.reduce((s, tx) => s + Math.abs(tx.amount), 0);
   const incomingTransfers = validTxns.filter(tx => {
     const m = budgetMonth(tx);
@@ -4039,12 +4089,12 @@ function buildFinancialContext() {
 
   const catSums = {};
   spending.filter(t => budgetMonth(t) === latestMonth).forEach(t => {
-    catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
+    if (t.amount < 0) catSums[t.category] = (catSums[t.category] || 0) + Math.abs(t.amount);
   });
   const catLines = Object.entries(catSums).sort((a,b) => b[1]-a[1])
     .map(([c, a]) => `  ${c}: ${currency}${a.toFixed(2)}`);
 
-  const totalSpend = spending.filter(t => budgetMonth(t) === latestMonth).reduce((s,t) => s + Math.abs(t.amount), 0);
+  const totalSpend = spending.filter(t => budgetMonth(t) === latestMonth).reduce((s,t) => s + (t.amount < 0 ? -t.amount : 0), 0);
   const totalIncome = income.filter(t => budgetMonth(t) === latestMonth).reduce((s,t) => s + Math.abs(t.amount), 0);
 
   return `User financial data:
