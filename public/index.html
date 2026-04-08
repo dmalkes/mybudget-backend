@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Dalia</title>
+  <title>Dália</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -162,7 +162,7 @@
     <div class="welcome-logo">
       <svg width="44" height="44" fill="none" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <h1 class="welcome-title">Dalia</h1>
+    <h1 class="welcome-title">Dália</h1>
     <p class="welcome-tagline">Assuma o controle das suas finanças</p>
     <button onclick="nextPage('welcome')" class="onboarding-button primary">Começar</button>
   </div>
@@ -403,7 +403,7 @@
         <div class="grad w-7 h-7 rounded-lg flex items-center justify-center">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <span class="font-bold text-slate-800 text-base">Delia</span>
+        <span class="font-bold text-slate-800 text-base">Dália</span>
       </div>
       <div class="flex items-center gap-2">
         <button onclick="showUploadSheet()" class="text-xs font-medium text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all">+ Upload</button>
@@ -451,7 +451,7 @@
         <!-- Left: Balance (big) + Income + Transfer in -->
         <div class="pr-4 border-r border-white/20">
           <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="balance_label">Balance</p>
-          <p id="heroBalance" class="text-3xl font-extrabold leading-tight mb-3" style="color:rgba(255,255,255,.4)">—</p>
+          <p id="heroBalance" onclick="openBalanceBreakdown()" class="text-3xl font-extrabold leading-tight mb-3 cursor-pointer hover:opacity-80 transition-opacity" style="color:rgba(255,255,255,.4)" title="Ver detalhes por conta">—</p>
           <div class="space-y-1.5">
             <div>
               <p class="text-white/50 text-[10px] font-semibold uppercase tracking-wide mb-0.5" data-i18n="income_label">Income</p>
@@ -497,7 +497,7 @@
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold text-slate-800" data-i18n="balance_trend_title">Evolução do saldo</h3>
         <div class="flex items-center gap-2">
-          <select id="balanceTrendMonth" onchange="renderBalanceTrend()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer"></select>
+          <select id="balanceTrendMonth" onchange="renderBalanceTrend()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 cursor-pointer"></select>
           <span id="balanceTrendDate" class="text-xs text-slate-400"></span>
         </div>
       </div>
@@ -608,9 +608,9 @@
 
     <!-- Filters -->
     <div class="card-sm p-3 mb-4 flex gap-2 flex-wrap">
-      <select id="txnMonthFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="filterTransactions()"></select>
-      <select id="txnCategoryFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="filterTransactions()"></select>
-      <select id="txnSortFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer" onchange="filterTransactions()">
+      <select id="txnMonthFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 cursor-pointer" onchange="filterTransactions()"></select>
+      <select id="txnCategoryFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 cursor-pointer" onchange="filterTransactions()"></select>
+      <select id="txnSortFilter" class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 cursor-pointer" onchange="filterTransactions()">
         <option value="date_desc">Data ↓</option>
         <option value="date_asc">Data ↑</option>
         <option value="amount_desc">Valor ↓</option>
@@ -666,6 +666,21 @@
     <button onclick="resetApp()" style="width:100%;padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:.9rem;color:#dc2626;border-radius:8px;transition:background .15s">
       🔄 Reiniciar e Recomeçar
     </button>
+  </div>
+
+  <!-- BALANCE BREAKDOWN MODAL -->
+  <div id="balanceBreakdownModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center">
+    <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <h3 style="font-size:1.1rem;font-weight:700;color:#1e293b;margin:0">💰 Saldo por conta</h3>
+        <button onclick="document.getElementById('balanceBreakdownModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#94a3b8;line-height:1">×</button>
+      </div>
+      <div id="balanceBreakdownList"></div>
+      <div style="margin-top:16px;padding-top:16px;border-top:2px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.85rem;font-weight:700;color:#1e293b">Total</span>
+        <span id="balanceBreakdownTotal" style="font-size:1.1rem;font-weight:800;color:#6366f1"></span>
+      </div>
+    </div>
   </div>
 
   <!-- CONNECTED ACCOUNTS MODAL -->
@@ -861,6 +876,12 @@ async function sbLoadFromCloud() {
   if (settings) {
     if (settings.account_balance != null) state.accountBalance = parseFloat(settings.account_balance);
     if (settings.language) state.language = settings.language;
+    if (settings.pluggy_items) {
+      try {
+        const cloudItems = JSON.parse(settings.pluggy_items);
+        if (cloudItems && cloudItems.length > 0) { state.pluggyItems = cloudItems; savePluggyItems(); }
+      } catch(e) {}
+    }
     saveAccountBalance();
   }
 }
@@ -871,6 +892,7 @@ async function sbSaveSettings() {
     user_id: _sbUser.id,
     language: state.language,
     account_balance: state.accountBalance || 0,
+    pluggy_items: JSON.stringify(state.pluggyItems || []),
     updated_at: new Date().toISOString()
   }, { onConflict: 'user_id' });
 }
@@ -896,7 +918,7 @@ function showAuthModal(mode = 'signin') {
   const m = document.getElementById('authModal');
   if (!m) return;
   document.getElementById('authModalMode').value = mode;
-  document.getElementById('authModalTitle').textContent = mode === 'signin' ? 'Entrar no Dalia' : 'Criar sua conta';
+  document.getElementById('authModalTitle').textContent = mode === 'signin' ? 'Entrar no Dália' : 'Criar sua conta';
   document.getElementById('authModalSwitch').innerHTML = mode === 'signin'
     ? `Não tem uma conta? <button class="text-violet-600 font-semibold underline" onclick="showAuthModal('signup')">Cadastrar</button>`
     : `Já tem uma conta? <button class="text-violet-600 font-semibold underline" onclick="showAuthModal('signin')">Entrar</button>`;
@@ -1614,6 +1636,7 @@ function saveAccountBalance() {
 
 function savePluggyItems() {
   try { localStorage.setItem(LS.PLUGGY_ITEMS, JSON.stringify(state.pluggyItems)); } catch(e) {}
+  sbSaveSettings(); // keep cloud in sync
 }
 
 function saveMappings() {
@@ -1963,6 +1986,8 @@ async function openPluggyWidget() {
           // Set account balance from Pluggy
           if (accounts && accounts.length > 0) {
             state.accountBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+            state.accountBalanceDate = new Date().toISOString().slice(0, 10);
+            saveAccountBalance();
           }
 
           // Map Pluggy transactions to app format
@@ -1975,8 +2000,8 @@ async function openPluggyWidget() {
             const pluggyCat = mapPluggyCategory(t.category);
             const appCat = pluggyCat || guessBrCategory(t.description, signedAmt);
 
-            // Credits: only salary/dividends/investments = Income; all other credits = Transfer In (PIX, TED, etc.)
-            const isTransfer = appCat === 'Transfers' || appCat === 'PIX' || (isCredit && appCat !== 'Income');
+            // Credits: only salary = Income; other credits = Transfer In. PIX debits = real spending (not transfer).
+            const isTransfer = appCat === 'Transfers' || (isCredit && appCat !== 'Income');
             const isIncome   = !isTransfer && appCat === 'Income';
 
             return {
@@ -2000,7 +2025,9 @@ async function openPluggyWidget() {
           state.transactions = [...state.transactions, ...mapped];
           // Track this Pluggy item for future syncs (replace entire list — one active connection)
           const accountName = accounts?.[0]?.name || 'Conta conectada';
-          state.pluggyItems = [{ itemId: item.id, accountName, connectedAt: new Date().toISOString() }];
+          const accountNames = (accounts || []).map(a => ({ name: a.name || accountName, balance: a.balance || 0 }));
+          const itemBalance = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
+          state.pluggyItems = [{ itemId: item.id, accountName, accountNames, balance: itemBalance, connectedAt: new Date().toISOString() }];
           savePluggyItems();
           updateSyncButtonVisibility();
           saveTransactions();
@@ -2054,9 +2081,12 @@ async function syncPluggyAccounts() {
         }
         const { transactions, accounts } = await resp.json();
 
-        // Accumulate balance
+        // Accumulate balance and store per-account breakdown
         if (accounts && accounts.length > 0) {
-          totalBalance += accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+          const itemBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+          totalBalance += itemBalance;
+          item.balance = itemBalance;
+          item.accountNames = accounts.map(a => ({ name: a.name || item.accountName, balance: a.balance || 0 }));
         }
 
         // Map transactions
@@ -2065,7 +2095,7 @@ async function syncPluggyAccounts() {
           const signedAmt = isCredit ? Math.abs(t.amount) : -Math.abs(t.amount);
           const pluggyCat = mapPluggyCategory(t.category);
           const appCat = pluggyCat || guessBrCategory(t.description, signedAmt);
-          const isTransfer = appCat === 'Transfers' || appCat === 'PIX' || (isCredit && appCat !== 'Income');
+          const isTransfer = appCat === 'Transfers' || (isCredit && appCat !== 'Income');
           const isIncome   = !isTransfer && appCat === 'Income';
           return {
             id:           crypto.randomUUID(),
@@ -2096,11 +2126,10 @@ async function syncPluggyAccounts() {
       // Add fresh transactions
       state.transactions = [...state.transactions, ...allNewTxns];
 
-      // Update balance
-      if (totalBalance > 0) {
-        state.accountBalance = totalBalance;
-        saveAccountBalance();
-      }
+      // Update balance (always save, even if zero or negative)
+      state.accountBalance = totalBalance;
+      saveAccountBalance();
+      savePluggyItems(); // persist per-account balances stored above
     }
 
     saveTransactions();
@@ -3446,17 +3475,17 @@ function renderBalanceTrend() {
   const locale = 'pt-BR';
   const selectedMonth = document.getElementById('balanceTrendMonth')?.value;
 
-  // Only use non-transfer, non-PIX transactions for balance (transfers cancel each other out)
+  // Exclude only internal Transfers (cancel each other out); PIX debits are real cash flow
   const allTxns = state.transactions
-    .filter(t => t.date && !t._isTransfer && t.category !== 'Transfers' && t.category !== 'PIX')
+    .filter(t => t.date && t.category !== 'Transfers' && !t._isTransfer)
     .sort((a, b) => a.date.localeCompare(b.date));
-  if (allTxns.length < 2) { card.classList.add('hidden'); return; }
+  if (allTxns.length < 1) { card.classList.add('hidden'); return; }
 
   // Filter to selected month
   const monthTxns = selectedMonth
     ? allTxns.filter(t => t.date.slice(0, 7) === selectedMonth)
     : allTxns;
-  if (monthTxns.length < 2) { card.classList.add('hidden'); return; }
+  if (monthTxns.length < 1) { card.classList.add('hidden'); return; }
 
   // Daily net delta for selected month
   const dailyDelta = {};
@@ -3464,7 +3493,7 @@ function renderBalanceTrend() {
     dailyDelta[tx.date] = (dailyDelta[tx.date] || 0) + tx.amount;
   }
   const dates = Object.keys(dailyDelta).sort();
-  if (dates.length < 2) { card.classList.add('hidden'); return; }
+  if (dates.length < 1) { card.classList.add('hidden'); return; }
 
   // Build balance series — reconstruct backwards from known balance if available
   let points;
@@ -4419,6 +4448,36 @@ function toggleSettingsMenu() {
   // language locked to PT — no button highlight needed
 }
 
+function openBalanceBreakdown() {
+  const items = state.pluggyItems || [];
+  const list = document.getElementById('balanceBreakdownList');
+  const totalEl = document.getElementById('balanceBreakdownTotal');
+
+  if (items.length === 0) {
+    list.innerHTML = '<p style="text-align:center;color:#94a3b8;font-size:.9rem;padding:16px 0">Nenhuma conta conectada.</p>';
+    totalEl.textContent = '';
+  } else {
+    let rows = '';
+    let total = 0;
+    items.forEach(item => {
+      const subAccounts = item.accountNames || [{ name: item.accountName || 'Conta', balance: item.balance || 0 }];
+      subAccounts.forEach(acc => {
+        total += acc.balance || 0;
+        const color = (acc.balance || 0) >= 0 ? '#10b981' : '#ef4444';
+        rows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9">
+          <span style="font-size:.875rem;color:#334155">${acc.name}</span>
+          <span style="font-size:.875rem;font-weight:700;color:${color}">${fmt(acc.balance || 0)}</span>
+        </div>`;
+      });
+    });
+    list.innerHTML = rows;
+    totalEl.textContent = fmt(total);
+    totalEl.style.color = total >= 0 ? '#10b981' : '#ef4444';
+  }
+
+  document.getElementById('balanceBreakdownModal').style.display = 'flex';
+}
+
 function openConnectedAccountsModal() {
   // Always read fresh from localStorage in case state hasn't been hydrated yet
   try {
@@ -4552,7 +4611,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
     <div class="flex items-center justify-between mb-5">
       <div>
-        <h2 id="authModalTitle" class="text-lg font-bold text-slate-800">Entrar no Dalia</h2>
+        <h2 id="authModalTitle" class="text-lg font-bold text-slate-800">Entrar no Dália</h2>
         <p class="text-xs text-slate-500 mt-0.5">Sincronize seus dados entre dispositivos</p>
       </div>
       <button onclick="hideAuthModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
