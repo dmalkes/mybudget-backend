@@ -1082,6 +1082,7 @@ app.get('/api/pluggy/transactions', async (req, res) => {
           page
         });
         allTransactions.push(...result.results.map(t => ({
+          id:          t.id,           // stable Pluggy transaction ID for dedup
           date:        t.date,
           description: t.description,
           amount:      t.amount,

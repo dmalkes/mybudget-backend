@@ -1961,23 +1961,27 @@ async function openPluggyWidget() {
             const isIncome   = !isTransfer && appCat === 'Income';
 
             return {
-              id:          crypto.randomUUID(),
-              date:        t.date.split('T')[0],
-              description: t.description,
-              amount:      signedAmt,
-              category:    isIncome ? 'Income' : (isTransfer ? 'Transfers' : appCat),
-              source:      'Pluggy',
+              id:           crypto.randomUUID(),
+              pluggyTxnId:  t.id,
+              date:         t.date.split('T')[0],
+              description:  t.description,
+              amount:       signedAmt,
+              category:     isIncome ? 'Income' : (isTransfer ? 'Transfers' : appCat),
+              source:       'Pluggy',
               pluggyItemId: item.id,
-              _isIncome:   isIncome,
-              _isTransfer: isTransfer,
-              accountName: t.accountName,
-              accountType: t.accountType,
+              _isIncome:    isIncome,
+              _isTransfer:  isTransfer,
+              accountName:  t.accountName,
+              accountType:  t.accountType,
             };
           });
-          // Merge with existing transactions (avoid duplicates by date+description+amount)
-          const existing = new Set(state.transactions.map(t => `${t.date}|${t.description}|${t.amount}`));
-          const newTxns = mapped.filter(t => !existing.has(`${t.date}|${t.description}|${t.amount}`));
-          state.transactions = [...state.transactions, ...newTxns];
+          // Replace strategy: remove all old transactions for this item, then add fresh ones.
+          // This is safer than content-based dedup, which can fail if Pluggy descriptions vary.
+          state.transactions = state.transactions.filter(t =>
+            t.pluggyItemId !== item.id &&
+            !(t.source === 'Pluggy' && !t.pluggyItemId)
+          );
+          state.transactions = [...state.transactions, ...mapped];
           // Track this Pluggy item for future syncs
           const accountName = accounts?.[0]?.name || 'Conta conectada';
           state.pluggyItems = [...(state.pluggyItems || []).filter(p => p.itemId !== item.id),
@@ -2046,10 +2050,11 @@ async function syncPluggyAccounts() {
           const signedAmt = isCredit ? Math.abs(t.amount) : -Math.abs(t.amount);
           const pluggyCat = mapPluggyCategory(t.category);
           const appCat = pluggyCat || guessBrCategory(t.description, signedAmt);
-          const isTransfer = appCat === 'Transfers' || (isCredit && appCat !== 'Income');
+          const isTransfer = appCat === 'Transfers' || appCat === 'PIX' || (isCredit && appCat !== 'Income');
           const isIncome   = !isTransfer && appCat === 'Income';
           return {
             id:           crypto.randomUUID(),
+            pluggyTxnId:  t.id,
             date:         t.date.split('T')[0],
             description:  t.description,
             amount:       signedAmt,
