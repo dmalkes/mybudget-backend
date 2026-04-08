@@ -152,6 +152,8 @@
     /* Toast notification */
     #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:10px 18px;border-radius:99px;font-size:.8rem;font-weight:600;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
     #toast.show{opacity:1}
+    /* Ensure dropdown options are always readable regardless of parent color */
+    select option { color: #1e293b; background: #ffffff; }
   </style>
 </head>
 <body>
@@ -496,8 +498,10 @@
     <div id="balanceTrendCard" class="card p-4 mb-4 fade-up hidden">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold text-slate-800" data-i18n="balance_trend_title">Evolução do saldo</h3>
-        <div class="flex items-center gap-2">
-          <select id="balanceTrendMonth" onchange="renderBalanceTrend()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 cursor-pointer"></select>
+        <div class="flex items-center gap-1.5 flex-wrap justify-end">
+          <select id="balanceTrendStart" onchange="renderBalanceTrend()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 cursor-pointer"></select>
+          <span class="text-xs text-slate-400">→</span>
+          <select id="balanceTrendEnd" onchange="renderBalanceTrend()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 cursor-pointer"></select>
           <span id="balanceTrendDate" class="text-xs text-slate-400"></span>
         </div>
       </div>
@@ -2022,6 +2026,7 @@ async function openPluggyWidget() {
           // Remove all Pluggy transactions locally and from Supabase before adding fresh ones.
           await sbDeletePluggyTransactions();
           state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
+          detectInternalPixTransfers(mapped);
           state.transactions = [...state.transactions, ...mapped];
           // Track this Pluggy item for future syncs (replace entire list — one active connection)
           const accountName = accounts?.[0]?.name || 'Conta conectada';
@@ -2123,7 +2128,7 @@ async function syncPluggyAccounts() {
     state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
 
     if (allNewTxns.length > 0) {
-      // Add fresh transactions
+      detectInternalPixTransfers(allNewTxns);
       state.transactions = [...state.transactions, ...allNewTxns];
 
       // Update balance (always save, even if zero or negative)
@@ -2224,6 +2229,30 @@ function parseCSVLine(line, sep = ',') {
   }
   fields.push(cur);
   return fields.map(f => f.trim());
+}
+
+// Detect PIX transactions that are internal transfers between the user's own connected accounts.
+// If a PIX debit on date D for amount X (from account A) matches a PIX credit on date D for amount X
+// (from account B, different pluggyItemId), both sides are marked as internal transfers.
+function detectInternalPixTransfers(transactions) {
+  const pixCredits = {};
+  transactions.forEach(t => {
+    if (t.category === 'PIX' && t.amount > 0) {
+      const key = `${t.date}|${Math.abs(t.amount).toFixed(2)}`;
+      if (!pixCredits[key]) pixCredits[key] = [];
+      pixCredits[key].push(t);
+    }
+  });
+  transactions.forEach(t => {
+    if (t.category === 'PIX' && t.amount < 0) {
+      const key = `${t.date}|${Math.abs(t.amount).toFixed(2)}`;
+      const matches = (pixCredits[key] || []).filter(c => c.pluggyItemId !== t.pluggyItemId);
+      if (matches.length > 0) {
+        t.category = 'Transfers'; t._isTransfer = true;
+        matches[0].category = 'Transfers'; matches[0]._isTransfer = true;
+      }
+    }
+  });
 }
 
 // Map Pluggy's own category taxonomy → app's canonical English categories
@@ -3256,11 +3285,15 @@ function renderDashboard() {
   document.getElementById('heroTransferIn').textContent  = fmt(incomingTransfers);
   document.getElementById('heroCount').textContent       = `${rangeTxns.length} ${t('hero_txns')}`;
 
-  // Balance: always current (unaffected by range)
+  // Balance: sum all connected accounts; fall back to stored total
+  const totalAccountBalance = (state.pluggyItems || []).reduce((s, item) => s + (item.balance || 0), 0);
+  const displayBalance = (state.pluggyItems && state.pluggyItems.length > 0) ? totalAccountBalance : state.accountBalance;
+  if (displayBalance != null) state.accountBalance = displayBalance; // keep in sync
+
   const balEl = document.getElementById('heroBalance');
-  if (state.accountBalance != null) {
-    balEl.textContent  = fmt(state.accountBalance);
-    balEl.style.color  = state.accountBalance >= 0 ? '#6ee7b7' : '#fca5a5';
+  if (displayBalance != null) {
+    balEl.textContent  = fmt(displayBalance);
+    balEl.style.color  = displayBalance >= 0 ? '#6ee7b7' : '#fca5a5';
   } else if (totalIncome > 0 || incomingTransfers > 0) {
     const net = totalIncome + incomingTransfers - totalSpent;
     balEl.textContent = (net >= 0 ? '+' : '-') + fmt(Math.abs(net));
@@ -3284,14 +3317,22 @@ function renderDashboard() {
     catMonthSel.value = selectedFrom;
   }
   renderCategoryChart(catSums);
-  // Populate balance trend month selector — preserves user's selection, independent of hero month
-  const balMonthSel = document.getElementById('balanceTrendMonth');
-  if (balMonthSel && spendMonths.length) {
-    const prevBal = balMonthSel.value;
-    balMonthSel.innerHTML = spendMonths.slice().reverse().map(m =>
+  // Populate balance trend start/end selectors
+  const allMonthsSorted = spendMonths.slice().sort();
+  const balStartSel = document.getElementById('balanceTrendStart');
+  const balEndSel   = document.getElementById('balanceTrendEnd');
+  if (balStartSel && balEndSel && allMonthsSorted.length) {
+    const opts = allMonthsSorted.map(m =>
       `<option value="${m}">${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
     ).join('');
-    balMonthSel.value = spendMonths.includes(prevBal) ? prevBal : defaultMonth;
+    const prevStart = balStartSel.value;
+    const prevEnd   = balEndSel.value;
+    balStartSel.innerHTML = opts;
+    balEndSel.innerHTML   = opts;
+    balStartSel.value = allMonthsSorted.includes(prevStart) ? prevStart : allMonthsSorted[0];
+    balEndSel.value   = allMonthsSorted.includes(prevEnd)   ? prevEnd   : allMonthsSorted[allMonthsSorted.length - 1];
+    // Ensure start <= end
+    if (balStartSel.value > balEndSel.value) balEndSel.value = balStartSel.value;
   }
 
   renderBalanceTrend();
@@ -3473,17 +3514,18 @@ function renderBalanceTrend() {
   if (!card) return;
 
   const locale = 'pt-BR';
-  const selectedMonth = document.getElementById('balanceTrendMonth')?.value;
+  const startMonth = document.getElementById('balanceTrendStart')?.value;
+  const endMonth   = document.getElementById('balanceTrendEnd')?.value;
 
-  // Exclude only internal Transfers (cancel each other out); PIX debits are real cash flow
+  // Exclude only internal Transfers; PIX debits are real cash flow
   const allTxns = state.transactions
     .filter(t => t.date && t.category !== 'Transfers' && !t._isTransfer)
     .sort((a, b) => a.date.localeCompare(b.date));
   if (allTxns.length < 1) { card.classList.add('hidden'); return; }
 
-  // Filter to selected month
-  const monthTxns = selectedMonth
-    ? allTxns.filter(t => t.date.slice(0, 7) === selectedMonth)
+  // Filter to selected range
+  const monthTxns = (startMonth && endMonth)
+    ? allTxns.filter(t => t.date.slice(0, 7) >= startMonth && t.date.slice(0, 7) <= endMonth)
     : allTxns;
   if (monthTxns.length < 1) { card.classList.add('hidden'); return; }
 
@@ -3495,16 +3537,22 @@ function renderBalanceTrend() {
   const dates = Object.keys(dailyDelta).sort();
   if (dates.length < 1) { card.classList.add('hidden'); return; }
 
-  // Build balance series — reconstruct backwards from known balance if available
+  // Build balance series — if we have a known balance AND the range covers today, reconstruct backwards
+  const today = new Date().toISOString().slice(0, 7);
+  const rangeCoversToday = !endMonth || endMonth >= today;
   let points;
-  if (state.accountBalance != null && !selectedMonth) {
+  if (state.accountBalance != null && rangeCoversToday) {
     let bal = state.accountBalance;
-    const rev = [...dates].reverse();
-    const map = {};
-    for (const d of rev) { map[d] = bal; bal -= (dailyDelta[d] || 0); }
-    points = dates.map(d => ({ x: d, y: map[d] }));
+    const allDatesInOrder = state.transactions
+      .filter(t => t.date && t.category !== 'Transfers' && !t._isTransfer && t.date.slice(0,7) > (endMonth || today))
+      .reduce((acc, t) => { acc[t.date] = (acc[t.date] || 0) + t.amount; return acc; }, {});
+    // Walk backwards from today's balance to start of range
+    let runBal = state.accountBalance;
+    Object.keys(allDatesInOrder).sort().reverse().forEach(d => { runBal -= allDatesInOrder[d]; });
+    // Now accumulate forward through range
+    runBal -= Object.values(dailyDelta).reduce((s, v) => s + v, 0);
+    points = dates.map(d => { runBal += dailyDelta[d] || 0; return { x: d, y: runBal }; });
   } else {
-    // Relative: accumulate forward from 0 within selected month
     let bal = 0;
     points = dates.map(d => { bal += dailyDelta[d] || 0; return { x: d, y: bal }; });
   }
@@ -3531,15 +3579,22 @@ function renderBalanceTrend() {
         backgroundColor: lineColor + '18',
         borderWidth: 2,
         pointRadius: 0,
+        pointHoverRadius: 5,
         fill: true,
         tension: 0.3
       }]
     },
     options: {
       responsive: true,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => fmt(c.parsed.y), title: ts => new Date(ts[0] + 'T12:00').toLocaleDateString(locale, {day:'numeric',month:'short'}) } }
+        tooltip: {
+          callbacks: {
+            label: c => ' ' + fmt(c.parsed.y),
+            title: ts => new Date(ts[0] + 'T12:00').toLocaleDateString(locale, {day:'numeric', month:'short', year:'numeric'})
+          }
+        }
       },
       scales: {
         x: {
