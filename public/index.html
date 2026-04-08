@@ -465,12 +465,10 @@
           <p id="heroTotal" class="text-3xl font-extrabold leading-tight truncate">R$0</p>
         </div>
       </div>
-      <!-- Date range filter -->
+      <!-- Month filter -->
       <div class="mt-3 pt-3 border-t border-white/20 flex items-center gap-2">
-        <span class="text-white/40 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0" data-i18n="hero_period">Period</span>
-        <select id="heroFromMonth" onchange="heroClampRange()" style="flex:1;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;border-radius:8px;font-size:.7rem;font-weight:600;padding:4px 6px;cursor:pointer;outline:none;min-width:0"></select>
-        <span class="text-white/40 text-xs flex-shrink-0">→</span>
-        <select id="heroToMonth" onchange="heroClampRange()" style="flex:1;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;border-radius:8px;font-size:.7rem;font-weight:600;padding:4px 6px;cursor:pointer;outline:none;min-width:0"></select>
+        <span class="text-white/40 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0" data-i18n="hero_period">Mês</span>
+        <select id="heroMonth" onchange="renderDashboard()" style="flex:1;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;border-radius:8px;font-size:.7rem;font-weight:600;padding:4px 6px;cursor:pointer;outline:none;min-width:0"></select>
       </div>
       <!-- Bottom strip -->
       <div class="mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
@@ -482,11 +480,26 @@
       </div>
     </div>
 
+    <!-- Fixed vs Variable mini bar on overview -->
+    <div class="card-sm p-4 mb-4 fade-up" id="overviewFvCard">
+      <div class="flex justify-between items-center mb-2">
+        <div>
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide" data-i18n="fv_title">Fixo vs Variável</span>
+          <span id="fvMonthLabel" class="ml-2 text-xs text-slate-400"></span>
+        </div>
+        <button onclick="switchTab('transactions')" class="text-xs text-indigo-500 font-medium" data-i18n="fv_details">Detalhes →</button>
+      </div>
+      <div id="overviewFvBar"></div>
+    </div>
+
     <!-- Balance trend chart -->
     <div id="balanceTrendCard" class="card p-4 mb-4 fade-up hidden">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800" data-i18n="balance_trend_title">Balance trend</h3>
-        <span id="balanceTrendDate" class="text-xs text-slate-400"></span>
+        <h3 class="font-semibold text-slate-800" data-i18n="balance_trend_title">Evolução do saldo</h3>
+        <div class="flex items-center gap-2">
+          <select id="balanceTrendMonth" onchange="renderBalanceTrend()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer"></select>
+          <span id="balanceTrendDate" class="text-xs text-slate-400"></span>
+        </div>
       </div>
       <canvas id="balanceTrendChart" height="60"></canvas>
     </div>
@@ -498,15 +511,6 @@
         <button onclick="document.getElementById('anomalyAlertsCard').classList.add('hidden')" class="text-xs text-amber-400 hover:text-amber-600 px-1">✕</button>
       </div>
       <div id="anomalyList"></div>
-    </div>
-
-    <!-- Fixed vs Variable mini bar on overview -->
-    <div class="card-sm p-4 mb-4 fade-up" id="overviewFvCard">
-      <div class="flex justify-between items-center mb-2">
-        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide" data-i18n="fv_title">Fixed vs Variable</span>
-        <button onclick="switchTab('transactions')" class="text-xs text-indigo-500 font-medium" data-i18n="fv_details">Details →</button>
-      </div>
-      <div id="overviewFvBar"></div>
     </div>
 
     <!-- Category breakdown -->
@@ -919,19 +923,20 @@ async function submitAuthModal() {
 // ─────────────────────────────────────
 // CATEGORIES & COLORS
 // ─────────────────────────────────────
-const CATEGORIES = ['Food & Dining','Groceries','Transportation','Shopping',
+const CATEGORIES = ['Food & Dining','Groceries','Transportation','Gas Station','Shopping',
   'Entertainment','Health & Medical','Utilities','Subscriptions & Software',
-  'Travel','Education','Home & Garden','Personal Care','Insurance',
-  'Business Services','Loans & Debt','Housing','Transfers','Refunds & Credits',
+  'Travel','Education','Personal Care','Insurance',
+  'Business Services','Loans & Debt','Housing','Transfers','PIX','Refunds & Credits',
   'Income','Cash & ATM','Banking Fees','Other'];
 
 const CAT_COLORS = {
   'Food & Dining':'#f97316','Groceries':'#22c55e','Transportation':'#3b82f6',
-  'Shopping':'#ec4899','Entertainment':'#a855f7','Health & Medical':'#ef4444',
-  'Utilities':'#64748b','Subscriptions & Software':'#0ea5e9','Travel':'#14b8a6',
-  'Education':'#f59e0b','Home & Garden':'#84cc16','Personal Care':'#e879f9',
+  'Gas Station':'#f59e0b','Shopping':'#ec4899','Entertainment':'#a855f7',
+  'Health & Medical':'#ef4444','Utilities':'#64748b','Subscriptions & Software':'#0ea5e9',
+  'Travel':'#14b8a6','Education':'#8b5cf6','Personal Care':'#e879f9',
   'Insurance':'#6366f1','Business Services':'#475569','Loans & Debt':'#dc2626',
-  'Housing':'#8b5cf6','Transfers':'#94a3b8','Refunds & Credits':'#10b981','Income':'#10b981',
+  'Housing':'#7c3aed','Transfers':'#94a3b8','PIX':'#06b6d4',
+  'Refunds & Credits':'#10b981','Income':'#10b981',
   'Cash & ATM':'#78716c','Banking Fees':'#6b7280','Other':'#9ca3af'
 };
 
@@ -1024,16 +1029,16 @@ const STRINGS = {
     chat_q3: 'How can I reduce expenses?',
     chat_q4: 'How is my spending trending?',
     cat_food: 'Food & Dining', cat_groceries: 'Groceries',
-    cat_transport: 'Transportation', cat_shopping: 'Shopping',
-    cat_entertainment: 'Entertainment', cat_health: 'Health & Medical',
-    cat_utilities: 'Utilities', cat_subscriptions: 'Subscriptions & Software',
-    cat_travel: 'Travel', cat_education: 'Education',
-    cat_home: 'Home & Garden', cat_personal: 'Personal Care',
+    cat_transport: 'Transportation', cat_gas: 'Gas Station',
+    cat_shopping: 'Shopping', cat_entertainment: 'Entertainment',
+    cat_health: 'Health & Medical', cat_utilities: 'Utilities',
+    cat_subscriptions: 'Subscriptions & Software', cat_travel: 'Travel',
+    cat_education: 'Education', cat_personal: 'Personal Care',
     cat_insurance: 'Insurance', cat_business: 'Business Services',
     cat_loans: 'Loans & Debt', cat_housing: 'Housing',
-    cat_transfers: 'Transfers', cat_refunds: 'Refunds & Credits',
-    cat_income: 'Income', cat_cash: 'Cash & ATM',
-    cat_banking: 'Banking Fees', cat_other: 'Other',
+    cat_transfers: 'Transfers', cat_pix: 'PIX',
+    cat_refunds: 'Refunds & Credits', cat_income: 'Income',
+    cat_cash: 'Cash & ATM', cat_banking: 'Banking Fees', cat_other: 'Other',
   },
   Portuguese: {
     welcome_tagline:'Assuma o controle das suas finanças',welcome_btn:'Começar',
@@ -1102,16 +1107,16 @@ const STRINGS = {
     chat_q3: 'Como posso reduzir gastos?',
     chat_q4: 'Como estão meus gastos?',
     cat_food: 'Alimentação', cat_groceries: 'Supermercado',
-    cat_transport: 'Transporte', cat_shopping: 'Compras',
-    cat_entertainment: 'Entretenimento', cat_health: 'Saúde',
-    cat_utilities: 'Serviços', cat_subscriptions: 'Assinaturas',
-    cat_travel: 'Viagem', cat_education: 'Educação',
-    cat_home: 'Casa e Jardim', cat_personal: 'Cuidados Pessoais',
+    cat_transport: 'Transporte', cat_gas: 'Posto de Gasolina',
+    cat_shopping: 'Compras', cat_entertainment: 'Lazer',
+    cat_health: 'Saúde', cat_utilities: 'Serviços',
+    cat_subscriptions: 'Assinaturas', cat_travel: 'Viagem',
+    cat_education: 'Educação', cat_personal: 'Cuidados Pessoais',
     cat_insurance: 'Seguros', cat_business: 'Serviços Empresariais',
     cat_loans: 'Empréstimos', cat_housing: 'Moradia',
-    cat_transfers: 'Transferências', cat_refunds: 'Reembolsos',
-    cat_income: 'Renda', cat_cash: 'Saque / ATM',
-    cat_banking: 'Tarifas Bancárias', cat_other: 'Outros',
+    cat_transfers: 'Transferências', cat_pix: 'PIX',
+    cat_refunds: 'Reembolsos e Créditos', cat_income: 'Salário / Renda',
+    cat_cash: 'Saque / ATM', cat_banking: 'Tarifas Bancárias', cat_other: 'Outros',
   },
   Hebrew: {
     welcome_tagline:'קח שליטה על הכספים שלך',welcome_btn:'בואו נתחיל',
@@ -1180,16 +1185,16 @@ const STRINGS = {
     chat_q3: 'איך אני יכול לצמצם הוצאות?',
     chat_q4: 'מהי מגמת ההוצאות שלי?',
     cat_food: 'אוכל ומסעדות', cat_groceries: 'מכולת וסופר',
-    cat_transport: 'תחבורה', cat_shopping: 'קניות',
-    cat_entertainment: 'בידור', cat_health: 'בריאות',
-    cat_utilities: 'חשבונות', cat_subscriptions: 'מנויים ותוכנה',
-    cat_travel: 'נסיעות', cat_education: 'חינוך',
-    cat_home: 'בית וגינה', cat_personal: 'טיפוח אישי',
+    cat_transport: 'תחבורה', cat_gas: 'תחנת דלק',
+    cat_shopping: 'קניות', cat_entertainment: 'בידור ופנאי',
+    cat_health: 'בריאות', cat_utilities: 'חשבונות',
+    cat_subscriptions: 'מנויים ותוכנה', cat_travel: 'נסיעות',
+    cat_education: 'חינוך', cat_personal: 'טיפוח אישי',
     cat_insurance: 'ביטוח', cat_business: 'שירותים עסקיים',
     cat_loans: 'הלוואות וחובות', cat_housing: 'דיור',
-    cat_transfers: 'העברות', cat_refunds: 'החזרים וזיכויים',
-    cat_income: 'הכנסה', cat_cash: 'מזומן / כספומט',
-    cat_banking: 'עמלות בנק', cat_other: 'אחר',
+    cat_transfers: 'העברות', cat_pix: 'PIX',
+    cat_refunds: 'החזרים וזיכויים', cat_income: 'משכורת / הכנסה',
+    cat_cash: 'מזומן / כספומט', cat_banking: 'עמלות בנק', cat_other: 'אחר',
   }
 };
 
@@ -1201,12 +1206,14 @@ function t(key) {
 // Map English category name → translated display name
 const CAT_KEY_MAP = {
   'Food & Dining':'cat_food','Groceries':'cat_groceries','Transportation':'cat_transport',
-  'Shopping':'cat_shopping','Entertainment':'cat_entertainment','Health & Medical':'cat_health',
-  'Utilities':'cat_utilities','Subscriptions & Software':'cat_subscriptions','Travel':'cat_travel',
-  'Education':'cat_education','Home & Garden':'cat_home','Personal Care':'cat_personal',
+  'Gas Station':'cat_gas','Shopping':'cat_shopping','Entertainment':'cat_entertainment',
+  'Health & Medical':'cat_health','Utilities':'cat_utilities',
+  'Subscriptions & Software':'cat_subscriptions','Travel':'cat_travel',
+  'Education':'cat_education','Personal Care':'cat_personal',
   'Insurance':'cat_insurance','Business Services':'cat_business','Loans & Debt':'cat_loans',
-  'Housing':'cat_housing','Transfers':'cat_transfers','Refunds & Credits':'cat_refunds',
-  'Income':'cat_income','Cash & ATM':'cat_cash','Banking Fees':'cat_banking','Other':'cat_other'
+  'Housing':'cat_housing','Transfers':'cat_transfers','PIX':'cat_pix',
+  'Refunds & Credits':'cat_refunds','Income':'cat_income',
+  'Cash & ATM':'cat_cash','Banking Fees':'cat_banking','Other':'cat_other'
 };
 function tCat(cat) { return t(CAT_KEY_MAP[cat] || cat) || cat; }
 
@@ -1512,6 +1519,8 @@ function loadStorage() {
             'Loans':                    'Loans & Debt',
             'Refund':                   'Refunds & Credits',
             'Cashback':                 'Refunds & Credits',
+            'PIX':                      'PIX',
+            'Pix':                      'PIX',
           };
           if (pluggyRawFix[t.category]) { t.category = pluggyRawFix[t.category]; migrationDirty = true; }
           // "Estorno de compra" / "Crédito de X" (positive) = refund, not spending
@@ -1519,9 +1528,23 @@ function loadStorage() {
             t.category = 'Refunds & Credits'; migrationDirty = true;
           }
         }
+        // Migrate removed Home & Garden category
+        if (t.category === 'Home & Garden') {
+          const dh = (t.description || '').toLowerCase();
+          if (/água|luz\b|energia|iptu|condom[íi]nio|aluguel|g[aá]s\s*(encanado|natural|canalizado)?\b|taxa|sabesp|copel|cemig|enel|cpfl|cedae|comgas/i.test(dh)) {
+            t.category = 'Housing';
+          } else {
+            t.category = 'Shopping';
+          }
+          migrationDirty = true;
+        }
+        // Migrate old Transfers that are actually PIX (description-based)
+        if (t.category === 'Transfers' && /\bpix\b/i.test(t.description || '')) {
+          t.category = 'PIX'; migrationDirty = true;
+        }
         // Re-derive flags from category (catches any past misclassification or stale flags)
         const shouldBeIncome   = t.category === 'Income';
-        const shouldBeTransfer = t.category === 'Transfers';
+        const shouldBeTransfer = t.category === 'Transfers' || t.category === 'PIX';
         if (t._isIncome !== shouldBeIncome || t._isTransfer !== shouldBeTransfer) {
           t._isIncome   = shouldBeIncome;
           t._isTransfer = shouldBeTransfer;
@@ -1934,7 +1957,7 @@ async function openPluggyWidget() {
             const appCat = pluggyCat || guessBrCategory(t.description, signedAmt);
 
             // Credits: only salary/dividends/investments = Income; all other credits = Transfer In (PIX, TED, etc.)
-            const isTransfer = appCat === 'Transfers' || (isCredit && appCat !== 'Income');
+            const isTransfer = appCat === 'Transfers' || appCat === 'PIX' || (isCredit && appCat !== 'Income');
             const isIncome   = !isTransfer && appCat === 'Income';
 
             return {
@@ -2047,8 +2070,12 @@ async function syncPluggyAccounts() {
 
     if (allNewTxns.length > 0) {
       // Remove all old Pluggy transactions (they'll be replaced with fresh ones)
+      // Also remove orphaned Pluggy txns without pluggyItemId (imported before tracking was added)
       const syncedItemIds = new Set(state.pluggyItems.map(p => p.itemId));
-      state.transactions = state.transactions.filter(t => !syncedItemIds.has(t.pluggyItemId));
+      state.transactions = state.transactions.filter(t =>
+        !syncedItemIds.has(t.pluggyItemId) &&
+        !(t.source === 'Pluggy' && !t.pluggyItemId)
+      );
 
       // Add fresh transactions
       state.transactions = [...state.transactions, ...allNewTxns];
@@ -2210,6 +2237,11 @@ function mapPluggyCategory(pluggyCat) {
     'Refund':                    'Refunds & Credits',
     'Refunds':                   'Refunds & Credits',
     'Cashback':                  'Refunds & Credits',
+    'PIX':                       'PIX',
+    'Pix':                       'PIX',
+    'Gas Station':               'Gas Station',
+    'Fuel':                      'Gas Station',
+    'Gas and Fuel':              'Gas Station',
     'Others':                    'Other',
     'Other':                     'Other',
   };
@@ -2224,10 +2256,12 @@ function guessBrCategory(desc, amount) {
     if (/sal[aá]rio|folha\s*pgto|pagto.*sal/i.test(d)) return 'Income';
     if (/rendimento|juros\s*(cr[eé]d|poup)|dividendo|\bcdb\b|lci|lca/i.test(d)) return 'Income';
     if (/estorno|reembolso|devolu[cç]|cr[eé]dito\s*de/i.test(d)) return 'Refunds & Credits';
-    if (/pix|ted\b|doc\b|transfer[eê]ncia|recebido|pagamento\s*receb/i.test(d)) return 'Transfers';
+    if (/pix/i.test(d)) return 'PIX';
+    if (/ted\b|doc\b|transfer[eê]ncia|recebido|pagamento\s*receb/i.test(d)) return 'Transfers';
     return 'Other';   // unrecognised positive → not assumed Income (isTransfer logic will catch Pluggy credits)
   }
-  if (/pix\s*(enviad|para\b)|ted\b|doc\b|transfer[eê]ncia|transf\b/i.test(d)) return 'Transfers';
+  if (/\bpix\b/i.test(d)) return 'PIX';
+  if (/ted\b|doc\b|transfer[eê]ncia|transf\b/i.test(d)) return 'Transfers';
   if (/saque|caixa\s*eletr/i.test(d)) return 'Cash & ATM';
   if (/tarifa|anuidade|\biof\b|juros\s*rot|multa|mora\b|\bcet\b/i.test(d)) return 'Banking Fees';
   if (/rentab\.?\s*invest|facil\s*cred|poupan[cç]/i.test(d)) return 'Income'; // Bradesco savings yield
@@ -2237,7 +2271,7 @@ function guessBrCategory(desc, amount) {
   if (/ifood|rappi|uber\s*eats|james\s*deliv|zee\s*deliv/i.test(d)) return 'Food & Dining';
   if (/mcdonald|burger\s*king|subway|bob\'?s\b|giraffas|habib|outback/i.test(d)) return 'Food & Dining';
   if (/\buber\b|99\s*(t[aá]xi|mob)|cabify|indriver/i.test(d)) return 'Transportation';
-  if (/ipiranga|shell\b|posto\b|combusti[vv]|gasolina|ra[ií]zen|br\s*rede/i.test(d)) return 'Transportation';
+  if (/ipiranga|shell\b|posto\b|combusti[vv]|gasolina|ra[ií]zen|br\s*rede/i.test(d)) return 'Gas Station';
   if (/metr[ôo]|sptrans|bilhete.*[uú]nico|supervia|cptm|\b[oô]nibus/i.test(d)) return 'Transportation';
   if (/carrefour|extra\b|assa[ií]|atac[aã]o|p[aã]o\s*de\s*a[cç][uú]|supermercado|hortifruti/i.test(d)) return 'Groceries';
   if (/mercado\s*livre|shopee|americanas|magazine\s*luiza|amazon|submarino/i.test(d)) return 'Shopping';
@@ -2250,7 +2284,7 @@ function guessBrCategory(desc, amount) {
   if (/unimed|bradesco\s*sa[uú]de|sulamerica|amil|hapvida/i.test(d)) return 'Insurance';
   if (/airbnb|booking|decolar|\bcvc\b|latam\b|azul\b|\bgol\b/i.test(d)) return 'Travel';
   if (/escola|faculdade|universidade|anhanguera|est[aá]cio|kroton/i.test(d)) return 'Education';
-  if (/leroy\s*merlin|telhanorte|tok.*stok/i.test(d)) return 'Home & Garden';
+  if (/leroy\s*merlin|telhanorte|tok.*stok/i.test(d)) return 'Shopping';
   return 'Other';
 }
 
@@ -3117,13 +3151,6 @@ function toggleFixed(txnId) {
 // ─────────────────────────────────────
 // RENDERING
 // ─────────────────────────────────────
-function heroClampRange() {
-  const from = document.getElementById('heroFromMonth');
-  const to   = document.getElementById('heroToMonth');
-  if (from && to && from.value > to.value) to.value = from.value;
-  renderDashboard();
-}
-
 function renderDashboard() {
   const todayStr    = new Date().toISOString().slice(0, 10);
   const now         = new Date();
@@ -3136,7 +3163,7 @@ function renderDashboard() {
     return t.date <= todayStr;
   });
   const spending = validTxns.filter(t => !t._isIncome && !t._isTransfer
-    && t.category !== 'Income' && t.category !== 'Transfers');
+    && t.category !== 'Income' && t.category !== 'Transfers' && t.category !== 'PIX');
   const credits  = validTxns.filter(t => t._isIncome || t.category === 'Income');
 
   // All months with spending data, sorted ascending
@@ -3144,36 +3171,23 @@ function renderDashboard() {
   const spendMonths = [...new Set(spending.map(t => budgetMonth(t)).filter(Boolean))].sort();
   const defaultMonth = spendMonths.includes(nowMonth) ? nowMonth : (spendMonths.at(-1) || nowMonth);
 
-  // Populate hero range selects — preserve previous selection if still valid
-  const fromSel = document.getElementById('heroFromMonth');
-  const toSel   = document.getElementById('heroToMonth');
-  if (fromSel && spendMonths.length) {
-    const prevFrom = fromSel.value;
-    const prevTo   = toSel.value;
-    const opts = spendMonths.map(m =>
-      `<option value="${m}">${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
+  // Populate hero month select — preserve previous selection if still valid
+  const monthSel = document.getElementById('heroMonth');
+  if (monthSel && spendMonths.length) {
+    const prev = monthSel.value;
+    monthSel.innerHTML = spendMonths.slice().reverse().map(m =>
+      `<option value="${m}">${new Date(m+'-01').toLocaleDateString(locale, {month:'long', year:'numeric'})}</option>`
     ).join('');
-    fromSel.innerHTML = opts;
-    toSel.innerHTML   = opts;
-    fromSel.value = spendMonths.includes(prevFrom) ? prevFrom : defaultMonth;
-    toSel.value   = spendMonths.includes(prevTo)   ? prevTo   : defaultMonth;
-    if (fromSel.value > toSel.value) toSel.value = fromSel.value;
+    monthSel.value = spendMonths.includes(prev) ? prev : defaultMonth;
   }
 
-  const selectedFrom = fromSel?.value || defaultMonth;
-  const selectedTo   = toSel?.value   || defaultMonth;
-  const multiMonth   = selectedFrom !== selectedTo;
+  const selectedFrom = monthSel?.value || defaultMonth;
+  const selectedTo   = selectedFrom;
 
   // Update "Spent" period label
   const spentLabel = document.getElementById('heroSpentLabel');
   if (spentLabel) {
-    if (multiMonth) {
-      const fromLbl = new Date(selectedFrom + '-01').toLocaleDateString(locale, {month:'short', year:'2-digit'});
-      const toLbl   = new Date(selectedTo   + '-01').toLocaleDateString(locale, {month:'short', year:'2-digit'});
-      spentLabel.textContent = fromLbl + ' → ' + toLbl;
-    } else {
-      spentLabel.textContent = new Date(selectedFrom + '-01').toLocaleDateString(locale, {month:'short', year:'numeric'});
-    }
+    spentLabel.textContent = new Date(selectedFrom + '-01').toLocaleDateString(locale, {month:'long', year:'numeric'});
   }
 
   // Filter data to selected range
@@ -3188,7 +3202,7 @@ function renderDashboard() {
   const incomingTransfers = validTxns.filter(tx => {
     const m = budgetMonth(tx);
     return m >= selectedFrom && m <= selectedTo
-      && (tx._isTransfer || tx.category === 'Transfers') && tx.amount > 0;
+      && (tx._isTransfer || tx.category === 'Transfers' || tx.category === 'PIX') && tx.amount > 0;
   }).reduce((s, tx) => s + Math.abs(tx.amount), 0);
 
   document.getElementById('heroTotal').textContent       = fmt(totalSpent);
@@ -3219,17 +3233,31 @@ function renderDashboard() {
   const catMonthSel = document.getElementById('catChartMonthFilter');
   if (catMonthSel) {
     catMonthSel.innerHTML = spendMonths.slice().reverse().map(m =>
-      `<option value="${m}" ${m === selectedTo ? 'selected' : ''}>${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
+      `<option value="${m}" ${m === selectedFrom ? 'selected' : ''}>${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
     ).join('');
-    catMonthSel.value = selectedTo;
+    catMonthSel.value = selectedFrom;
   }
   renderCategoryChart(catSums);
+  // Populate balance trend month selector and sync with hero
+  const balMonthSel = document.getElementById('balanceTrendMonth');
+  if (balMonthSel && spendMonths.length) {
+    const prevBal = balMonthSel.value;
+    balMonthSel.innerHTML = spendMonths.slice().reverse().map(m =>
+      `<option value="${m}">${new Date(m+'-01').toLocaleDateString(locale, {month:'short', year:'numeric'})}</option>`
+    ).join('');
+    balMonthSel.value = spendMonths.includes(prevBal) ? prevBal : selectedFrom;
+    // Sync to hero month if it changed
+    if (spendMonths.includes(selectedFrom)) balMonthSel.value = selectedFrom;
+  }
+
   renderBalanceTrend();
   renderMonthlyChart(spending);
 
-  // Fixed vs Variable — follows range
-  const fixedSum    = rangeTxns.filter(t => isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const variableSum = rangeTxns.filter(t => !isFixed(t)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  // Fixed vs Variable — follows selected month
+  const fixedSum    = rangeTxns.filter(t => isFixed(t)).reduce((s, t) => t.amount < 0 ? s - t.amount : s, 0);
+  const variableSum = rangeTxns.filter(t => !isFixed(t)).reduce((s, t) => t.amount < 0 ? s - t.amount : s, 0);
+  const fvLabel = document.getElementById('fvMonthLabel');
+  if (fvLabel) fvLabel.textContent = new Date(selectedFrom + '-01').toLocaleDateString(locale, {month:'long', year:'numeric'});
   document.getElementById('overviewFvBar').innerHTML =
     `<div class="fv-bar mb-2">
       <div style="flex:${fixedSum};background:#6366f1"></div>
@@ -3321,20 +3349,23 @@ function renderMonthlyChart(spending) {
   const monthly = {};
   spending.forEach(t => {
     const m = budgetMonth(t);
-    monthly[m] = (monthly[m] || 0) + Math.abs(t.amount);
+    if (t.amount < 0) monthly[m] = (monthly[m] || 0) - t.amount;
   });
 
-  // For the trend chart, income uses budgetMonth() so late-month salary payments
-  // (Papaya paid Jan 30 = February's salary) appear in the correct budget month.
   const monthlyIncome = {};
   state.transactions.filter(t => t._isIncome).forEach(t => {
     const m = budgetMonth(t);
     if (m) monthlyIncome[m] = (monthlyIncome[m] || 0) + Math.abs(t.amount);
   });
 
-  // Always show current calendar month + 5 months behind.
-  // Use local date parts (NOT toISOString) to avoid UTC offset shifting the month
-  // for users in timezones ahead of UTC (e.g. Israel UTC+2/+3).
+  const monthlyEntradas = {};
+  state.transactions
+    .filter(t => (t._isTransfer || t.category === 'Transfers' || t.category === 'PIX') && t.amount > 0)
+    .forEach(t => {
+      const m = budgetMonth(t);
+      if (m) monthlyEntradas[m] = (monthlyEntradas[m] || 0) + t.amount;
+    });
+
   const now = new Date();
   const CHART_MONTHS = Array.from({length: 6}, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
@@ -3357,22 +3388,38 @@ function renderMonthlyChart(spending) {
           label: t('chart_spending'),
           data: CHART_MONTHS.map(m => monthly[m] || 0),
           backgroundColor: 'rgba(99,102,241,.75)',
-          borderRadius: 5,
-          borderSkipped: false
+          borderRadius: 4,
+          borderSkipped: false,
+          stack: 'expenses'
         },
         {
           label: t('chart_income'),
           data: CHART_MONTHS.map(m => monthlyIncome[m] || 0),
-          backgroundColor: 'rgba(16,185,129,.65)',
-          borderRadius: 5,
-          borderSkipped: false
+          backgroundColor: 'rgba(16,185,129,.75)',
+          borderRadius: 0,
+          borderSkipped: false,
+          stack: 'income'
+        },
+        {
+          label: 'Entradas',
+          data: CHART_MONTHS.map(m => monthlyEntradas[m] || 0),
+          backgroundColor: 'rgba(6,182,212,.65)',
+          borderRadius: 4,
+          borderSkipped: false,
+          stack: 'income'
         }
       ]
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) }}},
-      scales: { y: { ticks: { callback: v => fmt(v) }, grid: { color: 'rgba(0,0,0,.04)' } } }
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.y)}` } }
+      },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: false, ticks: { callback: v => fmt(v) }, grid: { color: 'rgba(0,0,0,.04)' } }
+      }
     }
   });
 }
@@ -3381,33 +3428,39 @@ function renderBalanceTrend() {
   const card = document.getElementById('balanceTrendCard');
   if (!card) return;
 
-  // Need at least a few transactions with dates to build a trend
-  const allTxns = state.transactions.filter(t => t.date).sort((a, b) => a.date.localeCompare(b.date));
-  if (allTxns.length < 3) { card.classList.add('hidden'); return; }
+  const locale = 'pt-BR';
+  const selectedMonth = document.getElementById('balanceTrendMonth')?.value;
 
-  // Keep last 90 days
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // Only use non-transfer, non-PIX transactions for balance (transfers cancel each other out)
+  const allTxns = state.transactions
+    .filter(t => t.date && !t._isTransfer && t.category !== 'Transfers' && t.category !== 'PIX')
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (allTxns.length < 2) { card.classList.add('hidden'); return; }
 
-  // Daily net delta: sum all transaction amounts per day
+  // Filter to selected month
+  const monthTxns = selectedMonth
+    ? allTxns.filter(t => t.date.slice(0, 7) === selectedMonth)
+    : allTxns;
+  if (monthTxns.length < 2) { card.classList.add('hidden'); return; }
+
+  // Daily net delta for selected month
   const dailyDelta = {};
-  for (const tx of allTxns) {
-    if (tx.date >= cutoffStr) dailyDelta[tx.date] = (dailyDelta[tx.date] || 0) + tx.amount;
+  for (const tx of monthTxns) {
+    dailyDelta[tx.date] = (dailyDelta[tx.date] || 0) + tx.amount;
   }
   const dates = Object.keys(dailyDelta).sort();
   if (dates.length < 2) { card.classList.add('hidden'); return; }
 
-  // Build balance series
+  // Build balance series — reconstruct backwards from known balance if available
   let points;
-  if (state.accountBalance != null) {
-    // Reconstruct backwards from known current balance
+  if (state.accountBalance != null && !selectedMonth) {
     let bal = state.accountBalance;
     const rev = [...dates].reverse();
     const map = {};
     for (const d of rev) { map[d] = bal; bal -= (dailyDelta[d] || 0); }
     points = dates.map(d => ({ x: d, y: map[d] }));
   } else {
-    // Relative: accumulate forward from 0
+    // Relative: accumulate forward from 0 within selected month
     let bal = 0;
     points = dates.map(d => { bal += dailyDelta[d] || 0; return { x: d, y: bal }; });
   }
@@ -3420,6 +3473,10 @@ function renderBalanceTrend() {
   const lastVal = points[points.length - 1]?.y ?? 0;
   const lineColor = lastVal >= 0 ? '#10b981' : '#ef4444';
   const locale = 'pt-BR';
+  const yVals = points.map(p => p.y);
+  const yMin = Math.min(...yVals);
+  const yMax = Math.max(...yVals);
+  const yPad = Math.max((yMax - yMin) * 0.15, 50);
 
   state.charts.balanceTrend = new Chart(ctx, {
     type: 'line',
@@ -3446,7 +3503,7 @@ function renderBalanceTrend() {
           ticks: { maxTicksLimit: 5, font: { size: 10 }, callback: (v, i) => { const d = points[i]?.x; return d ? new Date(d + 'T12:00').toLocaleDateString(locale, {month:'short', day:'numeric'}) : ''; } },
           grid: { display: false }
         },
-        y: { ticks: { font: { size: 10 }, callback: v => fmt(v) }, grid: { color: '#f1f5f9' } }
+        y: { min: yMin - yPad, max: yMax + yPad, ticks: { font: { size: 10 }, callback: v => fmt(v) }, grid: { color: '#f1f5f9' } }
       }
     }
   });
@@ -3713,23 +3770,33 @@ function closeCatModal() {
   state.editingTxnId = null;
 }
 
+// Strip trailing store codes/numbers to get merchant root (e.g. "Zaffari 0034" → "zaffari")
+function merchantRoot(desc) {
+  return (desc || '').split(/[*|]/)[0].replace(/\s+\d{3,}\s*$/, '').trim().toLowerCase();
+}
+
 function selectCategory(cat) {
   const txn = state.transactions.find(t => t.id === state.editingTxnId);
   if (!txn) return;
 
   const applyAll = document.getElementById('catApplyAll').checked;
+  const root = merchantRoot(txn.description);
   const targets = applyAll
-    ? state.transactions.filter(t => t.description === txn.description)
+    ? state.transactions.filter(t =>
+        t.description === txn.description ||
+        (root.length >= 3 && merchantRoot(t.description) === root))
     : [txn];
 
   targets.forEach(t => {
-    t.category = cat;
+    t.category    = cat;
     t._isIncome   = cat === 'Income';
-    t._isTransfer = cat === 'Transfers';
+    t._isTransfer = cat === 'Transfers' || cat === 'PIX';
   });
 
   if (applyAll) {
+    // Store both exact and root-based mappings for future imports
     state.customMappings[txn.description] = cat;
+    if (root.length >= 3) state.customMappings[root] = cat;
     saveMappings();
   }
 
