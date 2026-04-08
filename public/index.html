@@ -1965,7 +1965,15 @@ async function openPluggyWidget() {
     }
     const { connectToken } = await res.json();
 
-    // Open the Pluggy Connect widget
+    // On mobile, use full-page redirect so bank apps can open natively for authentication
+    const isMobile = /Mobi|Android|iPhone|iPad|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      const redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname);
+      window.location.href = `https://connect.pluggy.ai?connectToken=${connectToken}&redirectUrl=${redirectUrl}`;
+      return;
+    }
+
+    // Desktop: use the embedded widget
     const pluggyConnect = new PluggyConnect({
       connectToken,
       onSuccess: async ({ item }) => {
@@ -2235,21 +2243,32 @@ function parseCSVLine(line, sep = ',') {
 // If a PIX debit on date D for amount X (from account A) matches a PIX credit on date D for amount X
 // (from account B, different pluggyItemId), both sides are marked as internal transfers.
 function detectInternalPixTransfers(transactions) {
-  const pixCredits = {};
+  // Pattern 1: description strongly suggests an internal/own-account transfer
+  const ownTransferRe = /transferência entre contas|transferencia entre contas|pix entre contas|ted entre contas|mesma titularidade|própria conta|propria conta|transf\. entre contas/i;
+
+  // Pattern 2: cross-account matching — PIX debit on date+amount matches a PIX/Transfer credit
+  // from a DIFFERENT pluggyItemId (two accounts connected to Dália)
+  const credits = {};
   transactions.forEach(t => {
-    if (t.category === 'PIX' && t.amount > 0) {
+    if (t.amount > 0 && (t.category === 'PIX' || t._isTransfer)) {
       const key = `${t.date}|${Math.abs(t.amount).toFixed(2)}`;
-      if (!pixCredits[key]) pixCredits[key] = [];
-      pixCredits[key].push(t);
+      if (!credits[key]) credits[key] = [];
+      credits[key].push(t);
     }
   });
+
   transactions.forEach(t => {
+    // Description-based: flag regardless of amount/account
+    if (ownTransferRe.test(t.description || '')) {
+      t.category = 'Transfers'; t._isTransfer = true; return;
+    }
+    // Cross-account matching: debit PIX paired with credit from different account
     if (t.category === 'PIX' && t.amount < 0) {
       const key = `${t.date}|${Math.abs(t.amount).toFixed(2)}`;
-      const matches = (pixCredits[key] || []).filter(c => c.pluggyItemId !== t.pluggyItemId);
-      if (matches.length > 0) {
-        t.category = 'Transfers'; t._isTransfer = true;
-        matches[0].category = 'Transfers'; matches[0]._isTransfer = true;
+      const match = (credits[key] || []).find(c => c.pluggyItemId !== t.pluggyItemId);
+      if (match) {
+        t.category = 'Transfers';     t._isTransfer = true;
+        match.category = 'Transfers'; match._isTransfer = true;
       }
     }
   });
@@ -3285,10 +3304,11 @@ function renderDashboard() {
   document.getElementById('heroTransferIn').textContent  = fmt(incomingTransfers);
   document.getElementById('heroCount').textContent       = `${rangeTxns.length} ${t('hero_txns')}`;
 
-  // Balance: sum all connected accounts; fall back to stored total
-  const totalAccountBalance = (state.pluggyItems || []).reduce((s, item) => s + (item.balance || 0), 0);
-  const displayBalance = (state.pluggyItems && state.pluggyItems.length > 0) ? totalAccountBalance : state.accountBalance;
-  if (displayBalance != null) state.accountBalance = displayBalance; // keep in sync
+  // Balance: sum pluggyItems balances only if they actually have balance data stored
+  const itemsWithBalance = (state.pluggyItems || []).filter(item => item.balance != null);
+  const displayBalance = itemsWithBalance.length > 0
+    ? itemsWithBalance.reduce((s, item) => s + item.balance, 0)
+    : state.accountBalance;
 
   const balEl = document.getElementById('heroBalance');
   if (displayBalance != null) {
@@ -3537,21 +3557,18 @@ function renderBalanceTrend() {
   const dates = Object.keys(dailyDelta).sort();
   if (dates.length < 1) { card.classList.add('hidden'); return; }
 
-  // Build balance series — if we have a known balance AND the range covers today, reconstruct backwards
-  const today = new Date().toISOString().slice(0, 7);
-  const rangeCoversToday = !endMonth || endMonth >= today;
+  // Build balance series — walk backwards from known balance if available
   let points;
-  if (state.accountBalance != null && rangeCoversToday) {
-    let bal = state.accountBalance;
-    const allDatesInOrder = state.transactions
-      .filter(t => t.date && t.category !== 'Transfers' && !t._isTransfer && t.date.slice(0,7) > (endMonth || today))
-      .reduce((acc, t) => { acc[t.date] = (acc[t.date] || 0) + t.amount; return acc; }, {});
-    // Walk backwards from today's balance to start of range
-    let runBal = state.accountBalance;
-    Object.keys(allDatesInOrder).sort().reverse().forEach(d => { runBal -= allDatesInOrder[d]; });
-    // Now accumulate forward through range
-    runBal -= Object.values(dailyDelta).reduce((s, v) => s + v, 0);
-    points = dates.map(d => { runBal += dailyDelta[d] || 0; return { x: d, y: runBal }; });
+  if (state.accountBalance != null) {
+    // Sum all non-transfer txns AFTER the selected range to find balance at end of range
+    const afterNet = allTxns
+      .filter(t => endMonth ? t.date.slice(0, 7) > endMonth : false)
+      .reduce((s, t) => s + t.amount, 0);
+    let bal = state.accountBalance - afterNet;
+    // Walk backwards through the range dates to assign end-of-day balances
+    const balMap = {};
+    [...dates].reverse().forEach(d => { balMap[d] = bal; bal -= (dailyDelta[d] || 0); });
+    points = dates.map(d => ({ x: d, y: balMap[d] }));
   } else {
     let bal = 0;
     points = dates.map(d => { bal += dailyDelta[d] || 0; return { x: d, y: bal }; });
@@ -3592,7 +3609,7 @@ function renderBalanceTrend() {
         tooltip: {
           callbacks: {
             label: c => ' ' + fmt(c.parsed.y),
-            title: ts => new Date(ts[0] + 'T12:00').toLocaleDateString(locale, {day:'numeric', month:'short', year:'numeric'})
+            title: ts => { const d = ts[0]?.label || ''; return d ? new Date(d + 'T12:00').toLocaleDateString(locale, {day:'numeric', month:'short', year:'numeric'}) : ''; }
           }
         }
       },
@@ -4639,6 +4656,58 @@ function showToast(msg, duration = 3500) {
 // ─────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   await sbInit();
+
+  // Handle Pluggy mobile redirect callback — URL contains ?itemId=xxx after bank auth
+  const urlParams = new URLSearchParams(window.location.search);
+  const pluggyItemId = urlParams.get('itemId') || urlParams.get('item_id');
+  if (pluggyItemId) {
+    // Clean the URL so a refresh doesn't re-trigger
+    window.history.replaceState({}, '', window.location.pathname);
+    checkExistingSession();
+    await sbLoadFromCloud();
+    startApp();
+    // Now import the connected item as if onSuccess fired
+    try {
+      showToast('📲 Importando transações…', 60000);
+      const resp = await fetch(`${BACKEND_URL}/api/pluggy/transactions?itemId=${pluggyItemId}`);
+      if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).message || 'Erro ao buscar transações');
+      const { transactions, accounts } = await resp.json();
+      if (accounts && accounts.length > 0) {
+        state.accountBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+        state.accountBalanceDate = new Date().toISOString().slice(0, 10);
+        saveAccountBalance();
+      }
+      const mapped = (transactions || []).map(t => {
+        const isCredit = t.type === 'CREDIT' || (t.type == null && t.amount > 0);
+        const signedAmt = isCredit ? Math.abs(t.amount) : -Math.abs(t.amount);
+        const pluggyCat = mapPluggyCategory(t.category);
+        const appCat = pluggyCat || guessBrCategory(t.description, signedAmt);
+        const isTransfer = appCat === 'Transfers' || (isCredit && appCat !== 'Income');
+        const isIncome = !isTransfer && appCat === 'Income';
+        return { id: crypto.randomUUID(), pluggyTxnId: t.id, date: t.date.split('T')[0],
+          description: t.description, amount: signedAmt,
+          category: isIncome ? 'Income' : (isTransfer ? 'Transfers' : appCat),
+          source: 'Pluggy', pluggyItemId, _isIncome: isIncome, _isTransfer: isTransfer,
+          accountName: t.accountName, accountType: t.accountType };
+      });
+      await sbDeletePluggyTransactions();
+      state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
+      detectInternalPixTransfers(mapped);
+      state.transactions = [...state.transactions, ...mapped];
+      const accountName = accounts?.[0]?.name || 'Conta conectada';
+      const accountNames = (accounts || []).map(a => ({ name: a.name || accountName, balance: a.balance || 0 }));
+      const itemBalance = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
+      state.pluggyItems = [{ itemId: pluggyItemId, accountName, accountNames, balance: itemBalance, connectedAt: new Date().toISOString() }];
+      savePluggyItems();
+      saveTransactions();
+      updateSyncButtonVisibility();
+      startApp();
+      showToast('✅ Conta conectada com sucesso!', 4000);
+    } catch (err) {
+      showToast('❌ Erro ao importar: ' + err.message, 5000);
+    }
+    return;
+  }
 
   if (_sbUser) {
     // Authenticated user (returning login or OAuth redirect)
