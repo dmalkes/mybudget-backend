@@ -658,11 +658,25 @@
   </div>
 
   <!-- SETTINGS MENU -->
-  <div id="settingsMenu" style="position:fixed;top:52px;right:16px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:8px;z-index:40;display:none;min-width:160px">
+  <div id="settingsMenu" style="position:fixed;top:52px;right:16px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:8px;z-index:40;display:none;min-width:180px">
     <!-- Language locked to PT for Brazil -->
+    <button onclick="openConnectedAccountsModal();toggleSettingsMenu()" style="width:100%;padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:.9rem;color:#1e293b;border-radius:8px;transition:background .15s">
+      🏦 Contas conectadas
+    </button>
     <button onclick="resetApp()" style="width:100%;padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:.9rem;color:#dc2626;border-radius:8px;transition:background .15s">
       🔄 Reiniciar e Recomeçar
     </button>
+  </div>
+
+  <!-- CONNECTED ACCOUNTS MODAL -->
+  <div id="connectedAccountsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center">
+    <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <h3 style="font-size:1.1rem;font-weight:700;color:#1e293b;margin:0">🏦 Contas conectadas</h3>
+        <button onclick="closeConnectedAccountsModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#94a3b8;line-height:1">×</button>
+      </div>
+      <div id="connectedAccountsList"></div>
+    </div>
   </div>
 
   <!-- TOAST NOTIFICATION -->
@@ -4401,6 +4415,45 @@ function toggleSettingsMenu() {
   const opening = menu.style.display === 'none';
   menu.style.display = opening ? 'block' : 'none';
   // language locked to PT — no button highlight needed
+}
+
+function openConnectedAccountsModal() {
+  const items = state.pluggyItems || [];
+  const list = document.getElementById('connectedAccountsList');
+
+  if (items.length === 0) {
+    list.innerHTML = '<p style="text-align:center;color:#94a3b8;font-size:.9rem;padding:16px 0">Nenhuma conta conectada.</p>';
+  } else {
+    list.innerHTML = items.map(item => {
+      const date = item.connectedAt
+        ? new Date(item.connectedAt).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })
+        : '';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f1f5f9">
+        <div>
+          <div style="font-size:.9rem;font-weight:600;color:#1e293b">${item.accountName || 'Conta bancária'}</div>
+          ${date ? `<div style="font-size:.75rem;color:#94a3b8;margin-top:2px">Conectada em ${date}</div>` : ''}
+        </div>
+        <button onclick="removeConnectedAccount('${item.itemId}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer">Remover</button>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('connectedAccountsModal').style.display = 'flex';
+}
+
+function closeConnectedAccountsModal() {
+  document.getElementById('connectedAccountsModal').style.display = 'none';
+}
+
+function removeConnectedAccount(itemId) {
+  if (!confirm('Remover esta conta? As transações importadas dela serão excluídas.')) return;
+  state.pluggyItems = (state.pluggyItems || []).filter(p => p.itemId !== itemId);
+  state.transactions = state.transactions.filter(t => t.pluggyItemId !== itemId);
+  savePluggyItems();
+  saveTransactions();
+  updateSyncButtonVisibility();
+  openConnectedAccountsModal(); // refresh list
+  renderDashboard();
 }
 
 async function sendChat() {
