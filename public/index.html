@@ -11,6 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.pluggy.ai/pluggy-connect/v2.2.0/pluggy-connect.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
@@ -270,7 +271,11 @@
     <button onclick="document.getElementById('uploadFileInput').click()" class="onboarding-button secondary" style="margin-bottom:12px" data-i18n="upload_browse">Browse files</button>
     <button onclick="useTestData()" class="onboarding-button secondary" style="border-color:#10b981;color:#10b981" data-i18n="upload_sample">Try with sample data</button>
 
-
+    <div style="margin:20px 0 4px;text-align:center;color:#94a3b8;font-size:0.8rem;letter-spacing:.05em;text-transform:uppercase">ou conecte seu banco</div>
+    <button id="pluggyBtn" onclick="openPluggyWidget()" class="onboarding-button secondary" style="border-color:#6366f1;color:#6366f1;width:100%;display:none">
+      🏦 Conectar conta bancária
+    </button>
+    <p id="pluggyNote" class="text-xs text-slate-500 text-center mt-2" style="display:none">Conexão segura via Pluggy — seus dados nunca são armazenados.</p>
 
     <div id="uploadFileList" class="mt-6 space-y-2"></div>
     <button id="uploadProcessBtn" class="hidden onboarding-button primary" onclick="processUploadedFiles()" data-i18n="upload_analyze">Analyze Files</button>
@@ -1836,7 +1841,43 @@ async function processFiles() {
   }
 }
 
-function showPluggyButton() { /* Israeli bank connection removed */ }
+function showPluggyButton() {
+  const btn  = document.getElementById('pluggyBtn');
+  const note = document.getElementById('pluggyNote');
+  if (btn)  btn.style.display  = 'block';
+  if (note) note.style.display = 'block';
+}
+
+async function openPluggyWidget() {
+  try {
+    // Get a connect token from our backend
+    const res = await fetch(`${BACKEND_URL}/api/pluggy/connect-token`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.message || 'Não foi possível iniciar a conexão. Verifique as credenciais Pluggy no servidor.');
+      return;
+    }
+    const { connectToken } = await res.json();
+
+    // Open the Pluggy Connect widget
+    const pluggyConnect = new PluggyConnect({
+      connectToken,
+      onSuccess: async ({ item }) => {
+        console.log('Pluggy item connected:', item.id);
+        // TODO: fetch transactions from backend using item.id
+        alert(`Conta conectada com sucesso! (item: ${item.id})\nEm breve: importação automática de transações.`);
+      },
+      onError: (err) => {
+        console.error('Pluggy error:', err);
+        alert('Erro ao conectar conta: ' + (err.message || JSON.stringify(err)));
+      },
+      onClose: () => console.log('Pluggy widget closed')
+    });
+    pluggyConnect.init();
+  } catch (e) {
+    alert('Erro ao abrir widget Pluggy: ' + e.message);
+  }
+}
 
 // ─────────────────────────────────────
 // UTILS

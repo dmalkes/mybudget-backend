@@ -1023,6 +1023,34 @@ app.get('/api/version', (req, res) => {
   });
 });
 
+// ─────────────────────────────────────
+// PLUGGY INTEGRATION
+// ─────────────────────────────────────
+// Set PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET environment variables to enable.
+// Get credentials at https://dashboard.pluggy.ai
+
+app.post('/api/pluggy/connect-token', async (req, res) => {
+  const clientId     = process.env.PLUGGY_CLIENT_ID;
+  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return res.status(503).json({
+      error: 'pluggy_not_configured',
+      message: 'Pluggy não está configurado. Adicione PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET nas variáveis de ambiente do servidor.'
+    });
+  }
+
+  try {
+    const { PluggyClient } = require('pluggy-sdk');
+    const client = new PluggyClient({ clientId, clientSecret });
+    const { accessToken: connectToken } = await client.createConnectToken();
+    res.json({ connectToken });
+  } catch (err) {
+    console.error('Pluggy connect-token error:', err);
+    res.status(500).json({ error: 'pluggy_error', message: err.message });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
