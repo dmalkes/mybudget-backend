@@ -812,6 +812,11 @@ async function sbPushTransactions() {
   }
 }
 
+async function sbDeletePluggyTransactions() {
+  if (!_sbUser) return;
+  await sb.from('transactions').delete().eq('user_id', _sbUser.id).eq('source', 'Pluggy');
+}
+
 async function sbSaveTransaction(t) {
   if (!_sbUser) return;
   await sb.from('transactions').upsert({
@@ -1989,8 +1994,8 @@ async function openPluggyWidget() {
               accountType:  t.accountType,
             };
           });
-          // Replace strategy: remove ALL existing Pluggy transactions (any item ID),
-          // since reconnecting creates a new item ID each time and we want a clean slate.
+          // Remove all Pluggy transactions locally and from Supabase before adding fresh ones.
+          await sbDeletePluggyTransactions();
           state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
           state.transactions = [...state.transactions, ...mapped];
           // Track this Pluggy item for future syncs (replace entire list — one active connection)
@@ -2083,12 +2088,9 @@ async function syncPluggyAccounts() {
       }
     }
 
-    // Always remove old Pluggy transactions for synced items to prevent duplicates
-    const syncedItemIds = new Set(state.pluggyItems.map(p => p.itemId));
-    state.transactions = state.transactions.filter(t =>
-      !syncedItemIds.has(t.pluggyItemId) &&
-      !(t.source === 'Pluggy' && !t.pluggyItemId)
-    );
+    // Remove all Pluggy transactions locally and from Supabase before adding fresh ones.
+    await sbDeletePluggyTransactions();
+    state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
 
     if (allNewTxns.length > 0) {
       // Add fresh transactions
@@ -4418,6 +4420,11 @@ function toggleSettingsMenu() {
 }
 
 function openConnectedAccountsModal() {
+  // Always read fresh from localStorage in case state hasn't been hydrated yet
+  try {
+    const pi = localStorage.getItem(LS.PLUGGY_ITEMS);
+    if (pi) state.pluggyItems = JSON.parse(pi);
+  } catch(e) {}
   const items = state.pluggyItems || [];
   const list = document.getElementById('connectedAccountsList');
 
