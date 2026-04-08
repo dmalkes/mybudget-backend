@@ -1029,24 +1029,76 @@ app.get('/api/version', (req, res) => {
 // Set PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET environment variables to enable.
 // Get credentials at https://dashboard.pluggy.ai
 
-app.post('/api/pluggy/connect-token', async (req, res) => {
+function getPluggyClient() {
   const clientId     = process.env.PLUGGY_CLIENT_ID;
   const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+  const { PluggyClient } = require('pluggy-sdk');
+  return new PluggyClient({ clientId, clientSecret });
+}
 
-  if (!clientId || !clientSecret) {
+app.post('/api/pluggy/connect-token', async (req, res) => {
+  const client = getPluggyClient();
+  if (!client) {
     return res.status(503).json({
       error: 'pluggy_not_configured',
       message: 'Pluggy não está configurado. Adicione PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET nas variáveis de ambiente do servidor.'
     });
   }
-
   try {
-    const { PluggyClient } = require('pluggy-sdk');
-    const client = new PluggyClient({ clientId, clientSecret });
     const { accessToken: connectToken } = await client.createConnectToken();
     res.json({ connectToken });
   } catch (err) {
     console.error('Pluggy connect-token error:', err);
+    res.status(500).json({ error: 'pluggy_error', message: err.message });
+  }
+});
+
+// Fetch all accounts + transactions for a connected item
+app.get('/api/pluggy/transactions', async (req, res) => {
+  const { itemId } = req.query;
+  if (!itemId) return res.status(400).json({ error: 'itemId required' });
+
+  const client = getPluggyClient();
+  if (!client) return res.status(503).json({ error: 'pluggy_not_configured' });
+
+  try {
+    // Get accounts for this item
+    const { results: accounts } = await client.fetchAccounts(itemId);
+
+    // Fetch transactions for each account (last 90 days)
+    const dateTo   = new Date();
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - 90);
+
+    const allTransactions = [];
+    for (const account of accounts) {
+      let page = 1;
+      while (true) {
+        const result = await client.fetchTransactions(account.id, {
+          from: dateFrom.toISOString().split('T')[0],
+          to:   dateTo.toISOString().split('T')[0],
+          pageSize: 500,
+          page
+        });
+        allTransactions.push(...result.results.map(t => ({
+          date:        t.date,
+          description: t.description,
+          amount:      t.amount,
+          type:        t.type,         // DEBIT or CREDIT
+          category:    t.category,
+          accountName: account.name,
+          accountType: account.type,
+          currency:    account.currencyCode || 'BRL'
+        })));
+        if (result.page >= result.totalPages) break;
+        page++;
+      }
+    }
+
+    res.json({ transactions: allTransactions, accounts: accounts.map(a => ({ id: a.id, name: a.name, type: a.type, balance: a.balance })) });
+  } catch (err) {
+    console.error('Pluggy transactions error:', err);
     res.status(500).json({ error: 'pluggy_error', message: err.message });
   }
 });
