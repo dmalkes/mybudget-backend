@@ -1975,17 +1975,13 @@ async function openPluggyWidget() {
               accountType:  t.accountType,
             };
           });
-          // Replace strategy: remove all old transactions for this item, then add fresh ones.
-          // This is safer than content-based dedup, which can fail if Pluggy descriptions vary.
-          state.transactions = state.transactions.filter(t =>
-            t.pluggyItemId !== item.id &&
-            !(t.source === 'Pluggy' && !t.pluggyItemId)
-          );
+          // Replace strategy: remove ALL existing Pluggy transactions (any item ID),
+          // since reconnecting creates a new item ID each time and we want a clean slate.
+          state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
           state.transactions = [...state.transactions, ...mapped];
-          // Track this Pluggy item for future syncs
+          // Track this Pluggy item for future syncs (replace entire list — one active connection)
           const accountName = accounts?.[0]?.name || 'Conta conectada';
-          state.pluggyItems = [...(state.pluggyItems || []).filter(p => p.itemId !== item.id),
-            { itemId: item.id, accountName, connectedAt: new Date().toISOString() }];
+          state.pluggyItems = [{ itemId: item.id, accountName, connectedAt: new Date().toISOString() }];
           savePluggyItems();
           updateSyncButtonVisibility();
           saveTransactions();
