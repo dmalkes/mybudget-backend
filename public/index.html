@@ -2031,16 +2031,22 @@ async function openPluggyWidget() {
               accountType:  t.accountType,
             };
           });
-          // Remove all Pluggy transactions locally and from Supabase before adding fresh ones.
+          // Remove only THIS item's transactions locally; keep other connected accounts intact.
+          // Delete all Pluggy from Supabase (clean slate), then saveTransactions re-pushes everything.
           await sbDeletePluggyTransactions();
-          state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
+          state.transactions = state.transactions.filter(t =>
+            t.pluggyItemId !== item.id && !(t.source === 'Pluggy' && !t.pluggyItemId)
+          );
           detectInternalPixTransfers(mapped);
           state.transactions = [...state.transactions, ...mapped];
-          // Track this Pluggy item for future syncs (replace entire list — one active connection)
+          // ADD this item to pluggyItems (don't replace — support multiple accounts)
           const accountName = accounts?.[0]?.name || 'Conta conectada';
           const accountNames = (accounts || []).map(a => ({ name: a.name || accountName, balance: a.balance || 0 }));
           const itemBalance = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
-          state.pluggyItems = [{ itemId: item.id, accountName, accountNames, balance: itemBalance, connectedAt: new Date().toISOString() }];
+          state.pluggyItems = [
+            ...(state.pluggyItems || []).filter(p => p.itemId !== item.id),
+            { itemId: item.id, accountName, accountNames, balance: itemBalance, connectedAt: new Date().toISOString() }
+          ];
           savePluggyItems();
           updateSyncButtonVisibility();
           saveTransactions();
@@ -3304,11 +3310,21 @@ function renderDashboard() {
   document.getElementById('heroTransferIn').textContent  = fmt(incomingTransfers);
   document.getElementById('heroCount').textContent       = `${rangeTxns.length} ${t('hero_txns')}`;
 
-  // Balance: sum pluggyItems balances only if they actually have balance data stored
+  // Balance: sum all connected accounts; reconstruct historical balance for past months
   const itemsWithBalance = (state.pluggyItems || []).filter(item => item.balance != null);
-  const displayBalance = itemsWithBalance.length > 0
+  const currentBalance = itemsWithBalance.length > 0
     ? itemsWithBalance.reduce((s, item) => s + item.balance, 0)
     : state.accountBalance;
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  let displayBalance = currentBalance;
+  if (currentBalance != null && selectedTo < currentMonth) {
+    // Past month selected — walk back from current balance by subtracting transactions after selectedTo
+    const afterNet = state.transactions
+      .filter(t => t.date && t.category !== 'Transfers' && !t._isTransfer && t.date.slice(0, 7) > selectedTo)
+      .reduce((s, t) => s + t.amount, 0);
+    displayBalance = currentBalance - afterNet;
+  }
 
   const balEl = document.getElementById('heroBalance');
   if (displayBalance != null) {
@@ -4691,13 +4707,18 @@ window.addEventListener('DOMContentLoaded', async () => {
           accountName: t.accountName, accountType: t.accountType };
       });
       await sbDeletePluggyTransactions();
-      state.transactions = state.transactions.filter(t => t.source !== 'Pluggy');
+      state.transactions = state.transactions.filter(t =>
+        t.pluggyItemId !== pluggyItemId && !(t.source === 'Pluggy' && !t.pluggyItemId)
+      );
       detectInternalPixTransfers(mapped);
       state.transactions = [...state.transactions, ...mapped];
       const accountName = accounts?.[0]?.name || 'Conta conectada';
       const accountNames = (accounts || []).map(a => ({ name: a.name || accountName, balance: a.balance || 0 }));
       const itemBalance = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
-      state.pluggyItems = [{ itemId: pluggyItemId, accountName, accountNames, balance: itemBalance, connectedAt: new Date().toISOString() }];
+      state.pluggyItems = [
+        ...(state.pluggyItems || []).filter(p => p.itemId !== pluggyItemId),
+        { itemId: pluggyItemId, accountName, accountNames, balance: itemBalance, connectedAt: new Date().toISOString() }
+      ];
       savePluggyItems();
       saveTransactions();
       updateSyncButtonVisibility();
